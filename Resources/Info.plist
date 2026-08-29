@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>Murmur YouTube</string>
+	<string>Murmur</string>
 	<key>CFBundleDisplayName</key>
-	<string>Murmur YouTube</string>
+	<string>Murmur</string>
 	<!-- Deliberately space-free and distinct from the existing app's `murmur`, so that
 	     `pkill`/`killall` on either app can never match the other. -->
 	<key>CFBundleExecutable</key>
@@ -44,8 +44,8 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Murmur YouTube listens while you hold the push-to-talk key so it can turn your speech into text.</string>
+	<string>Murmur listens while you hold the push-to-talk key so it can turn your speech into text.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Murmur YouTube transcribes your speech on-device to insert text where you're typing.</string>
+	<string>Murmur transcribes your speech on-device to insert text where you're typing.</string>
 </dict>
 </plist>

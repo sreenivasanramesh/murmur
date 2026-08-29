@@ -18,16 +18,16 @@ BUILD    := $(SCRATCH)/$(CONFIG)/$(EXEC)
 ## or similar detritus not allowed"). `xattr -cr` immediately before signing is not enough
 ## — the provider re-stamps in between. Staging in ~/Library/Caches sidesteps it entirely.
 STAGE    := $(HOME)/Library/Caches/MurmurYouTubeBuild
-APPNAME  := Murmur YouTube.app
+APPNAME  := Murmur.app
 BUNDLE   := $(STAGE)/$(APPNAME)
 CONTENTS := $(BUNDLE)/Contents
 
 ## TCC keys the Accessibility grant to the code signature, so an ad-hoc signature — which
 ## changes on every build — makes the user re-grant after every `make`. Signing with a
-## stable Developer ID keeps the identity constant and the grant sticky. Falls back to
-## ad-hoc ("-") on a machine without the cert.
+## stable identity (Developer ID or Apple Development) keeps the identity constant and the grant sticky.
+## Falls back to ad-hoc ("-") on a machine without any cert.
 SIGN_ID := $(shell security find-identity -v -p codesigning 2>/dev/null \
-             | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)".*/\1/')
+             | grep -E '"(Developer ID Application|Apple Development):' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 ifeq ($(strip $(SIGN_ID)),)
 SIGN_ID := -
 endif
@@ -75,7 +75,7 @@ run: app
 install: app
 	@pkill -x $(EXEC) 2>/dev/null || true
 	@# $(BUNDLE) is an absolute staging path — the destination must use $(APPNAME) alone.
-	@rm -rf "/Applications/$(APPNAME)"
+	@rm -rf "/Applications/$(APPNAME)" "/Applications/Murmur YouTube.app"
 	@cp -R "$(BUNDLE)" "/Applications/$(APPNAME)"
 	@open "/Applications/$(APPNAME)"
 	@echo "installed to /Applications/$(APPNAME)"

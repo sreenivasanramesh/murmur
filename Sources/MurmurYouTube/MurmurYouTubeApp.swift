@@ -8,9 +8,10 @@ struct MurmurYouTubeApp: App {
     var body: some Scene {
         // The main window. A `Window` rather than a `WindowGroup`: this app has one front
         // panel, and letting ⌘N spawn a second copy of a tape deck makes no sense.
-        Window("Murmur YouTube", id: "main") {
+        Window("Murmur", id: "main") {
             MainWindow(controller: delegate.controller)
         }
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 860, height: 620)
         .windowResizability(.contentMinSize)
         .commands {
@@ -68,14 +69,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // before the first dictation.
         RunLog.regenerate()
 
-        // Parakeet's models take ~20s to load from disk, and that cost lands on whichever
+        // Parakeet's models take a moment to load from disk, and that cost lands on whichever
         // dictation touches them first — so the first hold after every launch would stall
-        // with the HUD showing nothing. Warm them in the background instead, but only when
-        // they're actually going to be used and are already downloaded.
-        let willUseParakeet = Settings.shared.compareMode || Settings.shared.engine == .parakeet
-        if willUseParakeet, ParakeetModels.isDownloaded {
-            Task.detached(priority: .utility) {
-                _ = try? await ParakeetModels.shared.manager()
+        // with the HUD showing nothing. Warm them in the background instead, or trigger
+        // auto-download if a Parakeet engine is chosen.
+        let willUseParakeet = Settings.shared.compareMode || Settings.shared.engine.requiresParakeetModel
+        if willUseParakeet {
+            if ParakeetModels.isDownloaded {
+                Task.detached(priority: .utility) {
+                    _ = try? await ParakeetModels.shared.models()
+                }
+            } else {
+                ParakeetDownloadManager.shared.startDownloadIfNeeded()
             }
         }
 
@@ -89,7 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         observeState()
-        Log.app.info("Murmur YouTube ready — hold \(Settings.shared.pushToTalkKey.displayName) to dictate")
+        Log.app.info("Murmur ready — hold \(Settings.shared.pushToTalkKey.displayName) to dictate")
     }
 
     /// `murmuryt://clear` and `murmuryt://show`, used by the legacy HTML dashboard and
@@ -156,26 +161,18 @@ private struct MenuContent: View {
     @Bindable var controller: DictationController
     @State private var settings = Settings.shared
     @Environment(\.openWindow) private var openWindow
-    @State private var isPreloadingParakeet = false
-    @State private var parakeetOnDisk = ParakeetModels.isDownloaded
+    @State private var downloadManager = ParakeetDownloadManager.shared
 
     private var parakeetStatus: String {
-        if isPreloadingParakeet { return "Loading Parakeet models…" }
-        // Reflects what's actually on disk, not just what this menu instance has done.
-        return parakeetOnDisk ? "Parakeet models installed ✓" : "Download Parakeet models…"
-    }
-
-    private func preloadParakeet() {
-        guard !isPreloadingParakeet else { return }
-        isPreloadingParakeet = true
-        Task {
-            do {
-                _ = try await ParakeetModels.shared.manager()
-                parakeetOnDisk = ParakeetModels.isDownloaded
-            } catch {
-                Log.speech.error("Parakeet preload failed: \(error.localizedDescription)")
-            }
-            isPreloadingParakeet = false
+        switch downloadManager.status {
+        case .downloading(let progress, _):
+            return "Downloading Parakeet (\(Int(progress * 100))%)…"
+        case .downloaded:
+            return "Parakeet models installed ✓"
+        case .notDownloaded:
+            return "Download Parakeet models (~470 MB)…"
+        case .failed:
+            return "Download failed — Retry"
         }
     }
 
@@ -199,7 +196,15 @@ private struct MenuContent: View {
         Toggle("Compare mode (both engines)", isOn: $settings.compareMode)
 
         if !settings.compareMode {
-            Picker("Engine", selection: $settings.engine) {
+            Picker("Engine", selection: Binding(
+                get: { settings.engine },
+                set: { choice in
+                    settings.engine = choice
+                    if choice.requiresParakeetModel {
+                        downloadManager.startDownloadIfNeeded()
+                    }
+                }
+            )) {
                 ForEach(SpeechEngineChoice.allCases, id: \.self) { choice in
                     Text(choice.displayName).tag(choice)
                 }
@@ -227,11 +232,11 @@ private struct MenuContent: View {
         }
         .keyboardShortcut("d")
 
-        // Downloading ~470 MB on the first hold would look like a hang, so offer to do it
-        // deliberately instead.
-        if settings.engine == .parakeet {
-            Button(parakeetStatus) { preloadParakeet() }
-                .disabled(isPreloadingParakeet || parakeetOnDisk)
+        if settings.engine.requiresParakeetModel {
+            Button(parakeetStatus) {
+                downloadManager.startDownloadIfNeeded()
+            }
+            .disabled(downloadManager.status == .downloaded || downloadManager.status.isDownloading)
         }
 
         if !Permissions.hasAccessibility {
@@ -241,7 +246,7 @@ private struct MenuContent: View {
             Button("Grant Microphone…") { Permissions.openMicrophoneSettings() }
         }
 
-        Button("Quit Murmur YouTube") { NSApp.terminate(nil) }
+        Button("Quit Murmur") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
     }
 }

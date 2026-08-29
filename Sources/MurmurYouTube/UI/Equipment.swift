@@ -202,6 +202,14 @@ struct TransportKey: View {
                 if let systemImage {
                     Image(systemName: systemImage)
                         .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(labelColor)
+                } else if isEngaged {
+                    Circle()
+                        .fill(engagedColor == DS.Color.ink ? DS.Color.record : engagedColor)
+                        .frame(width: 5, height: 5)
+                        .overlay {
+                            Circle().strokeBorder(.white.opacity(0.4), lineWidth: 0.5)
+                        }
                 }
                 Silkscreen(text: title, color: labelColor)
             }
@@ -209,7 +217,7 @@ struct TransportKey: View {
             .frame(height: DS.Material.keyHeight)
             .padding(.horizontal, DS.Space.base)
             .background(cap)
-            .offset(y: isPressed ? DS.Material.keyTravel : 0)
+            .offset(y: (isPressed || isEngaged) ? DS.Material.keyTravel * 0.7 : 0)
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
@@ -220,25 +228,34 @@ struct TransportKey: View {
     }
 
     private var labelColor: Color {
-        isEngaged ? engagedColor : DS.Color.ink
+        if isEngaged {
+            return engagedColor == DS.Color.ink ? DS.Color.ink : engagedColor
+        }
+        return DS.Color.inkSecondary
     }
 
     private var cap: some View {
         ZStack {
             RoundedRectangle(cornerRadius: DS.Radius.control)
-                .fill(DS.Color.cap)
-            // Top bevel catches the light; bottom bevel is in shade. Swapped when pressed.
+                .fill(isEngaged ? DS.Color.selection : DS.Color.cap)
+
+            if isEngaged {
+                RoundedRectangle(cornerRadius: DS.Radius.control)
+                    .strokeBorder(DS.Color.selectionEdge, lineWidth: 1.5)
+            } else {
+                RoundedRectangle(cornerRadius: DS.Radius.control)
+                    .strokeBorder(isPressed ? DS.Color.panelShade : DS.Color.panelHighlight,
+                                  lineWidth: DS.Border.bevel)
+            }
+
             RoundedRectangle(cornerRadius: DS.Radius.control)
-                .strokeBorder(isPressed ? DS.Color.panelShade : DS.Color.panelHighlight,
-                              lineWidth: DS.Border.bevel)
-            RoundedRectangle(cornerRadius: DS.Radius.control)
-                .strokeBorder(DS.Color.seam.opacity(0.5), lineWidth: DS.Border.hairline)
+                .strokeBorder(DS.Color.seam.opacity(isEngaged ? 0.7 : 0.4), lineWidth: DS.Border.hairline)
         }
         .shadow(
-            color: (isPressed ? DS.Shadow.pressed : DS.Shadow.raised).color,
-            radius: (isPressed ? DS.Shadow.pressed : DS.Shadow.raised).radius,
-            x: (isPressed ? DS.Shadow.pressed : DS.Shadow.raised).x,
-            y: (isPressed ? DS.Shadow.pressed : DS.Shadow.raised).y
+            color: (isPressed || isEngaged ? DS.Shadow.pressed : DS.Shadow.raised).color,
+            radius: (isPressed || isEngaged ? DS.Shadow.pressed : DS.Shadow.raised).radius,
+            x: (isPressed || isEngaged ? DS.Shadow.pressed : DS.Shadow.raised).x,
+            y: (isPressed || isEngaged ? DS.Shadow.pressed : DS.Shadow.raised).y
         )
     }
 }

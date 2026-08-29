@@ -19,30 +19,32 @@ struct HUDView: View {
     @Bindable var controller: DictationController
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             Waveform(level: controller.level, isActive: controller.state == .listening)
-                .frame(width: 76, height: 26)
+                .frame(width: 64, height: 20)
 
             Text(label)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(isError ? Color.red.opacity(0.9) : .primary.opacity(0.85))
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(isError ? Color.red : Color(red: 0.1, green: 0.1, blue: 0.15))
                 .lineLimit(2)
                 .truncationMode(.head)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .animation(.easeOut(duration: 0.12), value: controller.transcript)
         }
         .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .frame(width: 340, height: 76)
+        .padding(.vertical, 12)
+        .frame(width: 320, height: 50)
         .background {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(.white.opacity(0.12), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
+            Capsule()
+                .fill(Color(white: 0.98).opacity(0.96))
+                .overlay(
+                    Capsule()
+                        .strokeBorder(Color.black.opacity(0.08), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.12), radius: 14, y: 5)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.clear)
     }
 
     private var isError: Bool {
@@ -52,13 +54,27 @@ struct HUDView: View {
 
     private var label: String {
         switch controller.state {
-        case .starting: "Listening…"
-        case .listening: controller.transcript.isEmpty ? "Listening…" : controller.transcript
-        // Parakeet transcribes in one pass on release, so there's nothing to show until
-        // it lands — say what's happening instead of leaving an empty pill.
-        case .finishing: controller.transcript.isEmpty ? "Transcribing…" : controller.transcript
-        case .error(let message): message
-        case .idle: ""
+        case .starting:
+            if case .downloading(let progress, _) = ParakeetDownloadManager.shared.status,
+               Settings.shared.engine.requiresParakeetModel {
+                return "Downloading model (\(Int(progress * 100))%)…"
+            }
+            return "Listening…"
+        case .listening:
+            if !controller.transcript.isEmpty {
+                return controller.transcript
+            }
+            if case .downloading(let progress, _) = ParakeetDownloadManager.shared.status,
+               Settings.shared.engine.requiresParakeetModel {
+                return "Downloading model (\(Int(progress * 100))%)…"
+            }
+            return "Listening…"
+        case .finishing:
+            return controller.transcript.isEmpty ? "Transcribing…" : controller.transcript
+        case .error(let message):
+            return message
+        case .idle:
+            return ""
         }
     }
 }

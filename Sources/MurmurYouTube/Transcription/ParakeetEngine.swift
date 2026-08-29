@@ -28,7 +28,7 @@ actor ParakeetEngine: TranscriptionEngine {
         let (stream, continuation) = AsyncThrowingStream<TranscriptionChunk, Error>.makeStream()
         self.continuation = continuation
 
-        // Force the (possibly very slow) first load to happen here rather than on release,
+        // Force the (possibly slow) first load to happen here rather than on release,
         // so the user waits before speaking instead of losing an utterance to a timeout.
         _ = try await ParakeetModels.shared.manager()
 
@@ -39,16 +39,6 @@ actor ParakeetEngine: TranscriptionEngine {
         let buffer = chunk.buffer
         guard buffer.frameLength > 0 else { return }
 
-        // Delegated to FluidAudio's own converter rather than hand-rolled, for one reason
-        // that matters more than tidiness: `AsrManager.transcribe(_ samples: [Float])`
-        // performs **no resampling and no rate validation**. Feed it the wrong sample rate
-        // and it doesn't throw — it silently transcribes garbage.
-        //
-        // That's a live risk here. In compare mode the capture format is dictated by
-        // Apple's analyzer, and `bestAvailableAudioFormat` may legitimately return 8 kHz
-        // as well as 16 kHz. `resampleBuffer` normalizes whatever arrives to the 16 kHz
-        // mono float32 the model expects, and its Int16→Float path is bit-identical to
-        // dividing by 32768, so nothing is lost versus doing it by hand.
         do {
             samples.append(contentsOf: try converter.resampleBuffer(buffer))
         } catch {
@@ -64,8 +54,6 @@ actor ParakeetEngine: TranscriptionEngine {
         }
 
         // Parakeet's encoder needs a minimum window; a stray tap of the key isn't speech.
-        // Logged rather than silent — an unexpected drop to zero here is how the
-        // format bug above disguised itself as a fast, empty result.
         guard samples.count >= 1_600 else {
             Log.speech.info("Parakeet: skipped — only \(self.samples.count) samples captured")
             return
@@ -96,65 +84,76 @@ actor ParakeetEngine: TranscriptionEngine {
             continuation = nil
         }
     }
-
 }
 
 /// Process-wide model cache.
 ///
 /// Loading is expensive — ~470 MB downloaded on first ever run, then a few seconds from
 /// disk per process — and the models are immutable once loaded, so every dictation shares
-/// one instance rather than paying that per utterance. Its own actor because `static var`
-/// on `ParakeetEngine` would be unprotected global mutable state under Swift 6.
+/// one instance rather than paying that per utterance.
 actor ParakeetModels {
     static let shared = ParakeetModels()
 
     /// Whether the models are already on disk, checked without loading them.
-    ///
-    /// `nonisolated` and filesystem-based on purpose: the menu needs this synchronously
-    /// while drawing, and an in-memory "have I loaded yet" flag would wrongly report
-    /// "not downloaded" on every fresh launch.
     nonisolated static var isDownloaded: Bool {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let encoder = support
-            .appendingPathComponent("FluidAudio/Models/parakeet-tdt-0.6b-v3/Encoder.mlmodelc")
-        return FileManager.default.fileExists(atPath: encoder.path)
+        let base = support.appendingPathComponent("FluidAudio/Models/parakeet-tdt-0.6b-v3")
+        let required = [
+            "Encoder.mlmodelc",
+            "Decoder.mlmodelc",
+            "JointDecisionv3.mlmodelc",
+            "Preprocessor.mlmodelc",
+            "parakeet_vocab.json"
+        ]
+        return required.allSatisfy { file in
+            FileManager.default.fileExists(atPath: base.appendingPathComponent(file).path)
+        }
     }
 
-    private var loaded: AsrManager?
-    private var loadTask: Task<AsrManager, Error>?
+    private var loadedModels: AsrModels?
+    private var loadedManager: AsrManager?
+    private var loadTask: Task<AsrModels, Error>?
 
-    var isLoaded: Bool { loaded != nil }
+    var isLoaded: Bool { loadedModels != nil }
 
-    /// Loads once; concurrent callers await the same task rather than racing to download.
-    func manager() async throws -> AsrManager {
-        if let loaded { return loaded }
+    func setLoadedModels(_ models: AsrModels) {
+        self.loadedModels = models
+        self.loadedManager = nil
+    }
+
+    func models() async throws -> AsrModels {
+        if let loadedModels { return loadedModels }
         if let loadTask { return try await loadTask.value }
 
-        let task = Task<AsrManager, Error> {
-            // Built as a value first: os.Logger requires a literal interpolation, so a
-            // ternary can't be passed directly as the argument.
+        let task = Task<AsrModels, Error> {
             let stage = Self.isDownloaded
                 ? "loading models from disk"
                 : "downloading models (~470 MB, one time)"
             Log.speech.info("Parakeet: \(stage, privacy: .public)")
             let started = Date()
             let models = try await AsrModels.downloadAndLoad(version: .v3, encoderPrecision: .int8)
-            let manager = AsrManager(config: .default)
-            try await manager.loadModels(models)
-            Log.speech.info("Parakeet: ready in \(Date().timeIntervalSince(started), format: .fixed(precision: 1))s")
-            return manager
+            Log.speech.info("Parakeet: models ready in \(Date().timeIntervalSince(started), format: .fixed(precision: 1))s")
+            return models
         }
         loadTask = task
 
         do {
-            let manager = try await task.value
-            loaded = manager
-            return manager
+            let models = try await task.value
+            loadedModels = models
+            return models
         } catch {
-            // Don't cache a failed load — a transient download error shouldn't wedge the
-            // engine for the rest of the session.
             loadTask = nil
             throw error
         }
+    }
+
+    /// Loads once; concurrent callers await the same task rather than racing to download.
+    func manager() async throws -> AsrManager {
+        if let loadedManager { return loadedManager }
+        let asrModels = try await models()
+        let manager = AsrManager(config: .default)
+        try await manager.loadModels(asrModels)
+        self.loadedManager = manager
+        return manager
     }
 }

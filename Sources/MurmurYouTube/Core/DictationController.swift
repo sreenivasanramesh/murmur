@@ -88,9 +88,11 @@ final class DictationController {
     /// - Returns: `false` if the hotkey tap couldn't be installed (missing Accessibility).
     @discardableResult
     func activate() -> Bool {
-        hotkey.key = Settings.shared.pushToTalkKey
-        hotkey.onPress = { [weak self] in self?.beginDictation() }
-        hotkey.onRelease = { [weak self] in self?.endDictation() }
+        hotkey.pushToTalkHotkey = Settings.shared.pushToTalkHotkey
+        hotkey.handsFreeHotkey = Settings.shared.handsFreeHotkey
+        hotkey.onPushToTalkPress = { [weak self] in self?.beginDictation() }
+        hotkey.onPushToTalkRelease = { [weak self] in self?.endDictation() }
+        hotkey.onHandsFreeTrigger = { [weak self] in self?.toggleHandsFreeDictation() }
         return hotkey.start()
     }
 
@@ -99,20 +101,24 @@ final class DictationController {
         cancelDictation()
     }
 
-    /// Re-arms the tap after the user picks a different push-to-talk key.
+    /// Re-arms the tap after the user picks or updates custom hotkeys.
     @discardableResult
     func reloadHotkey() -> Bool {
         hotkey.stop()
         return activate()
     }
 
-    // MARK: - Button-driven recording
+    // MARK: - Hands-free / Button-driven recording
+
+    func toggleHandsFreeDictation() {
+        if state.isActive {
+            endDictation()
+        } else {
+            beginDictation()
+        }
+    }
 
     /// Starts a recording from a Record button rather than the hotkey.
-    ///
-    /// Wispr Flow's hotkey is held down for the duration **only in compare mode**. Reaching
-    /// into another app is a comparison affordance; during ordinary dictation it would mean
-    /// every recording silently shipped your audio to a third party's servers.
     func startButtonRecording() {
         guard case .idle = state else { return }
         if Settings.shared.compareMode { WisprTrigger.press() }

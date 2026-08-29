@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The design system for Murmur YouTube.
+/// The design system for Murmur.
 ///
 /// Direction: 1980s portable field recorders and cassette decks — Sony TC-D5, Marantz PMD,
 /// Nakamichi, Braun. Equipment, not theme. Every value a view needs lives here; components
@@ -19,87 +19,63 @@ enum DS {
 
     // MARK: - Color
 
-    /// Surfaces, from the outer body inward. `Face` resolves each to the silver or black
-    /// variant based on the current appearance.
     enum Color {
-        /// The outer body of the unit. Darkest surface; frames everything.
-        static let chassis = face(light: 0x2A2825, dark: 0x121110)
+        /// Main application background — crisp, modern, light.
+        static let background = swatch(0xF8F9FA)
+        /// Header bar background.
+        static let header = swatch(0xFFFFFF)
+        /// Card & row background.
+        static let card = swatch(0xFFFFFF)
+        /// Card hover state.
+        static let cardHover = swatch(0xF3F4F6)
+        /// Subtle card border.
+        static let cardBorder = swatch(0xE5E7EB)
+        /// Header and divider border.
+        static let border = swatch(0xE5E7EB)
+        /// Inner pill / tab background.
+        static let tabBg = swatch(0xF1F3F5)
+        static let tabActive = swatch(0xFFFFFF)
+        static let tabBorder = swatch(0xE2E8F0)
 
-        /// The main working surface — brushed aluminum on silver, matte plastic on black.
-        static let panel = face(light: 0xB8B4AD, dark: 0x2E2C29)
+        /// Legacy compatibility aliases
+        static let chassis = background
+        static let panel = card
+        static let well = background
+        static let deck = card
+        static let cap = tabActive
+        static let seam = border
+        static let panelHighlight = cardBorder
+        static let panelShade = background
 
-        /// Top bevel highlight on a raised element.
-        static let panelHighlight = face(light: 0xC9C5BE, dark: 0x3C3936)
+        // Text — high contrast and crystal clear
+        static let ink = swatch(0x111827)
+        static let inkSecondary = swatch(0x4B5563)
+        static let inkMuted = swatch(0x6B7280)
+        static let silkscreen = inkSecondary
+        static let inkOnDeck = ink
 
-        /// Bottom bevel shade on a raised element.
-        static let panelShade = face(light: 0x9E9A93, dark: 0x211F1D)
-
-        /// Recessed wells — where lists, meters and readouts sit, set into the panel.
-        static let well = face(light: 0x6E6A64, dark: 0x1A1917)
-
-        /// The dark window of a tape deck. Backdrop for readouts and the transcript list.
-        static let deck = face(light: 0x38352F, dark: 0x151412)
-
-        /// Button caps and other molded plastic. Braun cream on silver, warm grey on black.
-        static let cap = face(light: 0xE8E3D8, dark: 0x35322E)
-
-        /// The hard line where two panels meet. Always the darkest value available.
-        static let seam = face(light: 0x6B6862, dark: 0x000000)
-
-        // Text
-        /// Primary readable text.
-        static let ink = face(light: 0x1C1A17, dark: 0xE4DED0)
-        /// Supporting text — timings, counts, secondary rows.
-        static let inkSecondary = face(light: 0x514D47, dark: 0x9A948A)
-        /// Silkscreened labels printed onto the panel. Slightly lower contrast than `ink`,
-        /// the way real screenprint sits into brushed metal.
-        static let silkscreen = face(light: 0x3A3630, dark: 0xB0AA9E)
-        /// Text on a dark readout well, regardless of face.
-        static let inkOnDeck = swatch(0xD8D2C4)
-
-        // Accent — the only red in the app
-        /// The record lamp. Lacquered, not fluorescent.
-        static let record = swatch(0xC8342A)
-        /// The lamp when unlit — a dark lens, not an absence.
-        static let recordIdle = face(light: 0x7A4A45, dark: 0x4A2724)
-
-        // Selection and focus. Deliberately not red: on real equipment red means one thing,
-        // and it needs to stay readable at a glance as "this is recording". Selection is
-        // carried by a lit panel plus a warm edge instead of by hue.
-        /// A selected row — the panel lifts rather than tints.
-        static let selection = face(light: 0xCDC8C0, dark: 0x3A3733)
-        /// Edge on a selected or focused element.
-        static let selectionEdge = face(light: 0x8A857D, dark: 0x585349)
-        /// Keyboard focus ring. Same family, higher contrast so it reads without color.
-        static let focusRing = face(light: 0x6B665E, dark: 0x726C61)
-        /// Row under the pointer, before selection.
-        static let hover = face(light: 0xC2BDB6, dark: 0x343130)
-
-        // Instrumentation only. Never use these for UI chrome.
-        /// Classic cream VU face.
+        // Accents
+        static let accent = swatch(0x4F46E5) // Indigo
+        static let accentSubtle = SwiftUI.Color(hex: 0x4F46E5).opacity(0.08)
+        static let record = swatch(0xDC2626) // Red
+        static let recordIdle = swatch(0xFEE2E2)
+        static let success = swatch(0x059669) // Emerald
+        static let info = swatch(0x0284C7) // Sky Blue
         static let meterFace = swatch(0xD8CFB4)
-        /// The amber lamp behind a VU face.
         static let meterLamp = swatch(0xE8B860)
-        /// Needle and scale printing.
         static let meterNeedle = swatch(0x1C1A17)
-        /// Nominal level.
-        static let meterGreen = swatch(0x6F9E45)
-        /// Approaching peak.
-        static let meterAmber = swatch(0xD39A2E)
-        /// Over.
-        static let meterRed = swatch(0xC0392B)
+        static let meterGreen = success
+        static let meterAmber = swatch(0xD97706)
+        static let meterRed = record
 
-        // MARK: Face resolution
+        // Selection / Hover
+        static let selection = swatch(0xF3F4F6)
+        static let selectionEdge = swatch(0x4F46E5)
+        static let focusRing = swatch(0x4F46E5)
+        static let hover = cardHover
 
+        // MARK: Helpers
         private static func swatch(_ hex: UInt32) -> SwiftUI.Color { SwiftUI.Color(hex: hex) }
-
-        /// Resolves to the silver-face or black-face value for the current appearance.
-        private static func face(light: UInt32, dark: UInt32) -> SwiftUI.Color {
-            SwiftUI.Color(nsColor: NSColor(name: nil) { appearance in
-                let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-                return NSColor(hex: isDark ? dark : light)
-            })
-        }
     }
 
     // MARK: - Material

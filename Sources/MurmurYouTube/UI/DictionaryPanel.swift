@@ -2,11 +2,7 @@ import MurmurDictionary
 import AppKit
 import SwiftUI
 
-/// The dictionary: add, edit, delete, search.
-///
-/// Both entry kinds live in one list rather than separate tabs — they're two shapes of the
-/// same idea and you want to see everything you've taught it at once. The kind is carried by
-/// a silkscreen tag on each row.
+/// The dictionary: add, edit, delete, search in a modern minimalist list.
 struct DictionaryPanel: View {
     @State private var store = DictionaryStore.shared
     @State private var query = ""
@@ -17,28 +13,51 @@ struct DictionaryPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                SearchField(text: $query, placeholder: "Search dictionary")
-                addButton
-                    .padding(.trailing, DS.Space.base)
-                    .background(DS.Color.deck)
+            // Header: Search & Add Entry Button
+            HStack(spacing: DS.Space.snug) {
+                ModernSearchField(text: $query, placeholder: "Search dictionary terms...")
+                    .frame(maxWidth: 340)
+
+                Spacer()
+
+                Button {
+                    isAdding = true
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("Add Entry")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(DS.Color.accent, in: RoundedRectangle(cornerRadius: 8))
+                    .shadow(color: DS.Color.accent.opacity(0.3), radius: 3, y: 1)
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut("n", modifiers: .command)
             }
+            .padding(.horizontal, DS.Space.roomy)
+            .padding(.vertical, 12)
+            .background(DS.Color.header)
             .overlay(alignment: .bottom) {
-                Rectangle().fill(DS.Color.seam).frame(height: DS.Border.seam)
+                Rectangle().fill(DS.Color.border).frame(height: 1)
             }
 
             if entries.isEmpty {
-                EmptyPanel(
-                    label: store.entries.isEmpty ? "Dictionary empty" : "No matches",
-                    detail: store.entries.isEmpty
-                        ? "Add words it keeps getting wrong."
-                        : "Try a different search."
+                ModernEmptyPanel(
+                    icon: "character.book.closed.fill",
+                    title: store.entries.isEmpty ? "Dictionary is empty" : "No matching terms",
+                    message: store.entries.isEmpty
+                        ? "Teach Murmur domain terminology, names, or phonetic corrections."
+                        : "Try searching for a different word or phrase."
                 )
             } else {
                 ScrollView {
-                    LazyVStack(spacing: DS.Space.tight) {
+                    LazyVStack(spacing: 8) {
                         ForEach(entries) { entry in
-                            DictionaryRow(
+                            ModernDictionaryRow(
                                 entry: entry,
                                 onEdit: { editing = entry },
                                 onToggle: {
@@ -50,65 +69,51 @@ struct DictionaryPanel: View {
                             )
                         }
                     }
-                    .padding(DS.Space.base)
+                    .padding(DS.Space.roomy)
                 }
             }
 
-            footer
+            // Footer
+            HStack(spacing: 8) {
+                Text("\(store.entries.count) custom \(store.entries.count == 1 ? "entry" : "entries") active")
+                    .font(.system(size: 12))
+                    .foregroundStyle(DS.Color.inkMuted)
+
+                Spacer()
+
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([DictionaryStore.fileURL])
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder")
+                            .font(.system(size: 11))
+                        Text("Reveal dictionary.txt in Finder")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundStyle(DS.Color.inkSecondary)
+                }
+                .buttonStyle(.plain)
+                .help(DictionaryStore.fileURL.path)
+            }
+            .padding(.horizontal, DS.Space.roomy)
+            .padding(.vertical, 10)
+            .background(DS.Color.header)
+            .overlay(alignment: .top) {
+                Rectangle().fill(DS.Color.border).frame(height: 1)
+            }
         }
         .sheet(isPresented: $isAdding) {
-            DictionaryEditor(entry: nil) { store.add($0) }
+            ModernDictionaryEditor(entry: nil) { store.add($0) }
         }
         .sheet(item: $editing) { entry in
-            DictionaryEditor(entry: entry) { store.update($0) }
-        }
-    }
-
-    private var addButton: some View {
-        Button { isAdding = true } label: {
-            HStack(spacing: DS.Space.tight) {
-                Image(systemName: "plus")
-                    .font(.system(size: 9, weight: .bold))
-                Silkscreen(text: "Add", color: DS.Color.inkOnDeck)
-            }
-            .foregroundStyle(DS.Color.inkOnDeck)
-            .padding(.horizontal, DS.Space.base)
-            .padding(.vertical, DS.Space.snug)
-            .overlay(
-                RoundedRectangle(cornerRadius: DS.Radius.chip)
-                    .strokeBorder(DS.Color.inkOnDeck.opacity(0.35), lineWidth: DS.Border.hairline)
-            )
-        }
-        .buttonStyle(.plain)
-        .keyboardShortcut("n", modifiers: .command)
-    }
-
-    /// The file path is shown because the spec asks for the dictionary to be editable outside
-    /// the UI — which is only true if you can find it.
-    private var footer: some View {
-        HStack(spacing: DS.Space.snug) {
-            Silkscreen(text: "\(store.entries.count) entries", color: DS.Color.inkOnDeck.opacity(0.5))
-            Spacer()
-            Button {
-                NSWorkspace.shared.activateFileViewerSelecting([DictionaryStore.fileURL])
-            } label: {
-                Silkscreen(text: "Reveal dictionary.txt", color: DS.Color.inkOnDeck.opacity(0.5))
-            }
-            .buttonStyle(.plain)
-            .help(DictionaryStore.fileURL.path)
-        }
-        .padding(.horizontal, DS.Space.base)
-        .padding(.vertical, DS.Space.snug)
-        .background(DS.Color.deck)
-        .overlay(alignment: .top) {
-            Rectangle().fill(DS.Color.seam).frame(height: DS.Border.seam)
+            ModernDictionaryEditor(entry: entry) { store.update($0) }
         }
     }
 }
 
-// MARK: - Row
+// MARK: - Modern Dictionary Row
 
-private struct DictionaryRow: View {
+private struct ModernDictionaryRow: View {
     let entry: DictionaryEntry
     let onEdit: () -> Void
     let onToggle: () -> Void
@@ -117,55 +122,92 @@ private struct DictionaryRow: View {
     @State private var isHovering = false
 
     var body: some View {
-        HStack(spacing: DS.Space.base) {
-            Lamp(color: DS.Color.meterGreen, isLit: entry.isEnabled, size: 6)
+        HStack(spacing: 12) {
+            // Enabled Toggle Checkbox
+            Button(action: onToggle) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(entry.isEnabled ? DS.Color.accent : DS.Color.tabBg)
+                        .frame(width: 16, height: 16)
+                        .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(entry.isEnabled ? DS.Color.accent : DS.Color.cardBorder, lineWidth: 1))
 
-            Silkscreen(
-                text: entry.kind == .correction ? "Fix" : "Term",
-                color: DS.Color.inkOnDeck.opacity(0.5)
-            )
-            .frame(width: 34, alignment: .leading)
-
-            if entry.kind == .correction {
-                Text(entry.hear)
-                    .font(DS.Font.body)
-                    .foregroundStyle(DS.Color.inkOnDeck.opacity(0.6))
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(DS.Color.inkOnDeck.opacity(0.4))
+                    if entry.isEnabled {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
             }
+            .buttonStyle(.plain)
 
-            Text(entry.write)
-                .font(DS.Font.bodyEmphasis)
-                .foregroundStyle(DS.Color.inkOnDeck)
+            // Kind Badge
+            Text(entry.kind == .correction ? "Correction" : "Term")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(entry.kind == .correction ? DS.Color.success : Color.purple)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background((entry.kind == .correction ? DS.Color.success : Color.purple).opacity(0.12), in: RoundedRectangle(cornerRadius: 5))
+
+            // Main Text Content
+            HStack(spacing: 6) {
+                if entry.kind == .correction {
+                    Text(entry.hear)
+                        .font(.system(size: 13))
+                        .foregroundStyle(DS.Color.inkMuted)
+                        .strikethrough()
+
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(DS.Color.inkMuted)
+                }
+
+                Text(entry.write)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(DS.Color.ink)
+            }
 
             Spacer()
 
+            // Actions (Edit & Delete)
             if isHovering {
-                rowButton("Edit", action: onEdit)
-                rowButton(entry.isEnabled ? "Off" : "On", action: onToggle)
-                rowButton("Delete", action: onDelete)
+                HStack(spacing: 6) {
+                    Button(action: onEdit) {
+                        Text("Edit")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(DS.Color.inkSecondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(DS.Color.tabBg, in: RoundedRectangle(cornerRadius: 5))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: onDelete) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.red.opacity(0.8))
+                            .padding(4)
+                            .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 5))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Delete entry")
+                }
             }
         }
         .opacity(entry.isEnabled ? 1 : 0.45)
-        .padding(.horizontal, DS.Space.base)
-        .padding(.vertical, DS.Space.snug)
-        .background(isHovering ? DS.Color.hover : DS.Color.deck, in: .rect(cornerRadius: DS.Radius.chip))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(isHovering ? DS.Color.cardHover : DS.Color.card, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(isHovering ? DS.Color.cardBorder.opacity(1.5) : DS.Color.cardBorder, lineWidth: 1)
+        )
         .onHover { isHovering = $0 }
-    }
-
-    private func rowButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Silkscreen(text: title, color: DS.Color.inkOnDeck.opacity(0.6))
-        }
-        .buttonStyle(.plain)
     }
 }
 
-// MARK: - Editor
+// MARK: - Modern Editor
 
-/// Add or edit one entry, with the false-positive warning shown live as you type.
-private struct DictionaryEditor: View {
+private struct ModernDictionaryEditor: View {
     let entry: DictionaryEntry?
     let onSave: (DictionaryEntry) -> Void
 
@@ -199,88 +241,123 @@ private struct DictionaryEditor: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DS.Space.roomy) {
-            Silkscreen(text: entry == nil ? "New entry" : "Edit entry", large: true)
-
-            kindPicker
-
-            VStack(alignment: .leading, spacing: DS.Space.base) {
-                if kind == .correction {
-                    field("When you hear", text: $hear, prompt: "cloud code")
+        VStack(alignment: .leading, spacing: 18) {
+            // Header
+            HStack {
+                Text(entry == nil ? "New Dictionary Entry" : "Edit Dictionary Entry")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(DS.Color.ink)
+                Spacer()
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(DS.Color.inkMuted)
                 }
-                field(
-                    kind == .correction ? "Write" : "Word or phrase",
-                    text: $write,
-                    prompt: kind == .correction ? "Claude Code" : "Anthropic"
+                .buttonStyle(.plain)
+            }
+
+            // Segmented Kind Picker
+            HStack(spacing: 4) {
+                ForEach([DictionaryEntry.Kind.term, .correction], id: \.self) { candidate in
+                    Button {
+                        withAnimation { kind = candidate }
+                    } label: {
+                        Text(candidate == .term ? "Term" : "Correction")
+                            .font(.system(size: 12, weight: kind == candidate ? .semibold : .medium))
+                            .foregroundStyle(kind == candidate ? DS.Color.ink : DS.Color.inkSecondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background {
+                                if kind == candidate {
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(DS.Color.tabActive)
+                                }
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(3)
+            .background(DS.Color.tabBg, in: RoundedRectangle(cornerRadius: 8))
+
+            // Inputs
+            VStack(alignment: .leading, spacing: 12) {
+                if kind == .correction {
+                    fieldView(
+                        label: "When you hear (spoken text):",
+                        prompt: "cloud code",
+                        text: $hear
+                    )
+                }
+
+                fieldView(
+                    label: kind == .correction ? "Replace with (written text):" : "Word or phrase:",
+                    prompt: kind == .correction ? "Claude Code" : "Kubernetes",
+                    text: $write
                 )
             }
 
+            // Warnings
             ForEach(warnings) { warning in
-                HStack(alignment: .top, spacing: DS.Space.snug) {
-                    Lamp(color: DS.Color.meterAmber, isLit: true, size: 6)
-                        .padding(.top, 3)
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(DS.Color.meterAmber)
+                        .padding(.top, 2)
+
                     Text(warning.message)
-                        .font(DS.Font.label)
-                        .foregroundStyle(DS.Color.ink)
+                        .font(.system(size: 11))
+                        .foregroundStyle(DS.Color.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(DS.Space.snug)
+                .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .overlay(
-                    RoundedRectangle(cornerRadius: DS.Radius.chip)
-                        .strokeBorder(DS.Color.meterAmber.opacity(0.4), lineWidth: DS.Border.hairline)
-                )
+                .background(DS.Color.meterAmber.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
             }
 
-            HStack(spacing: DS.Space.snug) {
+            // Action Buttons
+            HStack(spacing: 10) {
                 Spacer()
-                TransportKey(title: "Cancel") { dismiss() }
-                TransportKey(title: "Save", isEngaged: isValid, engagedColor: DS.Color.ink) {
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+
+                Button("Save") {
                     guard isValid else { return }
                     onSave(draft)
                     dismiss()
                 }
+                .buttonStyle(.borderedProminent)
                 .disabled(!isValid)
+                .keyboardShortcut(.defaultAction)
             }
+            .padding(.top, 6)
         }
-        .padding(DS.Space.panel)
-        .frame(width: 460)
-        .background(BrushedPanel(radius: DS.Radius.window))
+        .padding(22)
+        .frame(width: 440)
+        .background(DS.Color.card)
     }
 
-    private var kindPicker: some View {
-        HStack(spacing: DS.Space.snug) {
-            ForEach([DictionaryEntry.Kind.term, .correction], id: \.self) { candidate in
-                TransportKey(
-                    title: candidate == .term ? "Term" : "Correction",
-                    isEngaged: kind == candidate,
-                    engagedColor: DS.Color.ink
-                ) {
-                    withAnimation(DS.Motion.panel) { kind = candidate }
-                }
-                .background {
-                    if kind == candidate {
-                        RoundedRectangle(cornerRadius: DS.Radius.control).fill(DS.Color.selection)
-                    }
-                }
-            }
-        }
-    }
+    private func fieldView(label: String, prompt: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(DS.Color.inkSecondary)
 
-    private func field(_ label: String, text: Binding<String>, prompt: String) -> some View {
-        VStack(alignment: .leading, spacing: DS.Space.tight) {
-            Silkscreen(text: label)
-            TextField(prompt, text: text)
-                .textFieldStyle(.plain)
-                .font(DS.Font.body)
-                .foregroundStyle(DS.Color.inkOnDeck)
-                .padding(.horizontal, DS.Space.snug)
-                .padding(.vertical, DS.Space.snug)
-                .background(DS.Color.deck, in: .rect(cornerRadius: DS.Radius.chip))
-                .overlay(
-                    RoundedRectangle(cornerRadius: DS.Radius.chip)
-                        .strokeBorder(DS.Color.seam, lineWidth: DS.Border.hairline)
-                )
+            ZStack(alignment: .leading) {
+                if text.wrappedValue.isEmpty {
+                    Text(prompt)
+                        .font(.system(size: 13))
+                        .foregroundStyle(DS.Color.inkMuted)
+                }
+                TextField("", text: text)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .foregroundStyle(DS.Color.ink)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(DS.Color.tabBg, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(DS.Color.cardBorder, lineWidth: 1))
         }
     }
 }

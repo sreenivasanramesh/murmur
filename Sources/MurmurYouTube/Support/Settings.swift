@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import Foundation
 import Observation
 
@@ -13,8 +14,17 @@ enum SpeechEngineChoice: String, CaseIterable, Sendable {
         }
     }
 
+    var shortName: String {
+        switch self {
+        case .apple: "Apple"
+        case .parakeet: "Parakeet"
+        }
+    }
+
     /// Apple shows text while you talk; Parakeet only resolves on release.
     var showsLiveText: Bool { self == .apple }
+
+    var requiresParakeetModel: Bool { self == .parakeet }
 }
 
 @MainActor
@@ -22,8 +32,37 @@ enum SpeechEngineChoice: String, CaseIterable, Sendable {
 final class Settings {
     static let shared = Settings()
 
+    var pushToTalkHotkey: CustomHotkey {
+        didSet {
+            if let data = try? JSONEncoder().encode(pushToTalkHotkey) {
+                defaults.set(data, forKey: Keys.pushToTalkHotkey)
+            }
+        }
+    }
+
+    var handsFreeHotkey: CustomHotkey {
+        didSet {
+            if let data = try? JSONEncoder().encode(handsFreeHotkey) {
+                defaults.set(data, forKey: Keys.handsFreeHotkey)
+            }
+        }
+    }
+
     var pushToTalkKey: PushToTalkKey {
-        didSet { defaults.set(pushToTalkKey.rawValue, forKey: Keys.pushToTalkKey) }
+        get {
+            if let firstKey = pushToTalkHotkey.keys.first {
+                switch firstKey.keyCode {
+                case Int64(kVK_RightOption): return .rightOption
+                case Int64(kVK_Function): return .fn
+                case Int64(kVK_RightCommand): return .rightCommand
+                default: return .rightOption
+                }
+            }
+            return .rightOption
+        }
+        set {
+            pushToTalkHotkey = newValue.asCustomHotkey
+        }
     }
 
     var engine: SpeechEngineChoice {
@@ -54,6 +93,8 @@ final class Settings {
     private let defaults = UserDefaults.standard
 
     private enum Keys {
+        static let pushToTalkHotkey = "pushToTalkHotkey"
+        static let handsFreeHotkey = "handsFreeHotkey"
         static let pushToTalkKey = "pushToTalkKey"
         static let cleanupEnabled = "cleanupEnabled"
         static let soundEnabled = "soundEnabled"
@@ -63,8 +104,22 @@ final class Settings {
     }
 
     private init() {
-        let raw = defaults.string(forKey: Keys.pushToTalkKey) ?? PushToTalkKey.rightOption.rawValue
-        pushToTalkKey = PushToTalkKey(rawValue: raw) ?? .rightOption
+        if let data = defaults.data(forKey: Keys.pushToTalkHotkey),
+           let decoded = try? JSONDecoder().decode(CustomHotkey.self, from: data) {
+            pushToTalkHotkey = decoded
+        } else {
+            let legacyRaw = defaults.string(forKey: Keys.pushToTalkKey) ?? PushToTalkKey.rightOption.rawValue
+            let legacyKey = PushToTalkKey(rawValue: legacyRaw) ?? .rightOption
+            pushToTalkHotkey = legacyKey.asCustomHotkey
+        }
+
+        if let data = defaults.data(forKey: Keys.handsFreeHotkey),
+           let decoded = try? JSONDecoder().decode(CustomHotkey.self, from: data) {
+            handsFreeHotkey = decoded
+        } else {
+            handsFreeHotkey = .defaultHandsFree
+        }
+
         // Apple by default: no download, no dependency, live text while speaking.
         engine = SpeechEngineChoice(rawValue: defaults.string(forKey: Keys.engine) ?? "") ?? .apple
         cleanupEnabled = defaults.object(forKey: Keys.cleanupEnabled) as? Bool ?? true
