@@ -3,7 +3,7 @@ import ServiceManagement
 import SwiftUI
 
 @main
-struct MurmurYouTubeApp: App {
+struct MurmurApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     var body: some Scene {
@@ -171,10 +171,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    /// `murmuryt://clear` and `murmuryt://main`, used by the legacy HTML dashboard and
+    /// `murmur://clear` and `murmur://main`, used by the legacy HTML dashboard and
     /// as a scriptable way to raise the window.
     func application(_ application: NSApplication, open urls: [URL]) {
-        for url in urls where url.scheme == "murmuryt" {
+        for url in urls where url.scheme == "murmur" || url.scheme == "murmuryt" {
             switch url.host {
             case "clear":
                 RunLog.clear()

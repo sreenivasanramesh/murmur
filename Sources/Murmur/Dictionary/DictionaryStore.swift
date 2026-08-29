@@ -36,10 +36,15 @@ final class DictionaryStore {
     private var isSaving = false
 
     static var fileURL: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("MurmurYouTube", isDirectory: true)
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let base = appSupport.appendingPathComponent("Murmur", isDirectory: true)
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-        return base.appendingPathComponent("dictionary.txt")
+        let target = base.appendingPathComponent("dictionary.txt")
+        let legacy = appSupport.appendingPathComponent("MurmurYouTube", isDirectory: true).appendingPathComponent("dictionary.txt")
+        if !FileManager.default.fileExists(atPath: target.path) && FileManager.default.fileExists(atPath: legacy.path) {
+            try? FileManager.default.copyItem(at: legacy, to: target)
+        }
+        return target
     }
 
     private init() {
