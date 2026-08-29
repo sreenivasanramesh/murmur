@@ -122,14 +122,11 @@ final class DictationController {
     /// Starts a recording from a Record button rather than the hotkey.
     func startButtonRecording() {
         guard case .idle = state else { return }
-        if Settings.shared.compareMode { WisprTrigger.press() }
         beginDictation()
     }
 
-    /// Releases Wispr's hotkey first, so its upload starts while our own engines are still
-    /// finishing — otherwise every run would wait the full round trip end to end.
+    /// Stops recording from a Record button rather than the hotkey.
     func stopButtonRecording() {
-        WisprTrigger.release()
         endDictation()
     }
 
@@ -140,9 +137,8 @@ final class DictationController {
         state = .starting
         transcript = ""
         holdStarted = Date()
-        isComparing = Settings.shared.compareMode
         recorded.removeAll(keepingCapacity: true)
-        engineName = isComparing ? "Comparing…" : Settings.shared.engine.displayName
+        engineName = Settings.shared.engine.displayName
 
         if Settings.shared.cleanupEnabled {
             FoundationModelFormatter.warmUp()

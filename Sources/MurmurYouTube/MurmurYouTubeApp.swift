@@ -43,12 +43,6 @@ struct MurmurYouTubeApp: App {
         } label: {
             Image(systemName: delegate.controller.state.isActive ? "waveform.circle.fill" : "waveform")
         }
-
-        Window("Engine comparison", id: "comparison") {
-            ComparisonWindow(controller: delegate.controller)
-        }
-        .defaultSize(width: 640, height: 560)
-        .windowResizability(.contentMinSize)
     }
 }
 
@@ -95,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // dictation touches them first — so the first hold after every launch would stall
         // with the HUD showing nothing. Warm them in the background instead, or trigger
         // auto-download if a Parakeet engine is chosen.
-        let willUseParakeet = Settings.shared.compareMode || Settings.shared.engine.requiresParakeetModel
+        let willUseParakeet = Settings.shared.engine.requiresParakeetModel
         if willUseParakeet {
             if ParakeetModels.isDownloaded {
                 Task.detached(priority: .utility) {
@@ -103,15 +97,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             } else {
                 ParakeetDownloadManager.shared.startDownloadIfNeeded()
-            }
-        }
-
-        // Every `make install` relaunches the app and drops its windows. Restoring the
-        // window when it was open last time keeps it from vanishing on each rebuild.
-        if UserDefaults.standard.bool(forKey: "comparisonWindowOpen") {
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(400))
-                Self.showComparisonWindow()
             }
         }
 
@@ -168,7 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    /// `murmuryt://clear` and `murmuryt://show`, used by the legacy HTML dashboard and
+    /// `murmuryt://clear` and `murmuryt://main`, used by the legacy HTML dashboard and
     /// as a scriptable way to raise the window.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls where url.scheme == "murmuryt" {
@@ -176,8 +161,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "clear":
                 RunLog.clear()
                 RunStore.shared.reload()
-            case "show":
-                Self.showComparisonWindow()
             case "main", "open":
                 Self.showMainWindow()
             default:
@@ -186,20 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Raises the comparison window without needing SwiftUI's `openWindow` environment
-    /// value — usable from the app delegate and from a URL handler.
-    static func showComparisonWindow() {
-        NSApp.setActivationPolicy(.regular)
-        RunStore.shared.reload()
-        if let existing = NSApp.windows.first(where: { $0.title == "Engine comparison" }) {
-            existing.makeKeyAndOrderFront(nil)
-        }
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
     func applicationWillTerminate(_ notification: Notification) {
-        let isOpen = NSApp.windows.contains { $0.title == "Engine comparison" && $0.isVisible }
-        UserDefaults.standard.set(isOpen, forKey: "comparisonWindowOpen")
         controller.deactivate()
     }
 
@@ -262,33 +232,17 @@ private struct MenuContent: View {
 
         Divider()
 
-        Picker("Push-to-talk key", selection: Binding(
-            get: { settings.pushToTalkKey },
-            set: { key in
-                settings.pushToTalkKey = key
-                controller.reloadHotkey()
+        Picker("Engine", selection: Binding(
+            get: { settings.engine },
+            set: { choice in
+                settings.engine = choice
+                if choice.requiresParakeetModel {
+                    downloadManager.startDownloadIfNeeded()
+                }
             }
         )) {
-            ForEach(PushToTalkKey.allCases, id: \.self) { key in
-                Text(key.displayName).tag(key)
-            }
-        }
-
-        Toggle("Compare mode (all engines)", isOn: $settings.compareMode)
-
-        if !settings.compareMode {
-            Picker("Engine", selection: Binding(
-                get: { settings.engine },
-                set: { choice in
-                    settings.engine = choice
-                    if choice.requiresParakeetModel {
-                        downloadManager.startDownloadIfNeeded()
-                    }
-                }
-            )) {
-                ForEach(SpeechEngineChoice.allCases, id: \.self) { choice in
-                    Text(choice.displayName).tag(choice)
-                }
+            ForEach(SpeechEngineChoice.allCases, id: \.self) { choice in
+                Text(choice.displayName).tag(choice)
             }
         }
 
@@ -310,13 +264,6 @@ private struct MenuContent: View {
         ))
 
         Divider()
-
-        Button("Show comparison window") {
-            RunStore.shared.reload()
-            openWindow(id: "comparison")
-            NSApp.activate(ignoringOtherApps: true)
-        }
-        .keyboardShortcut("d")
 
         if settings.engine.requiresParakeetModel {
             Button(parakeetStatus) {
