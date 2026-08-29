@@ -105,7 +105,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.app.info("Murmur ready — hold \(Settings.shared.pushToTalkKey.displayName) to dictate")
     }
 
-    /// Listens for window close notifications to switch to background accessory mode when no windows remain.
+    /// Helper to identify standard document windows and ignore status bar / panel windows.
+    @MainActor
+    static func isDocumentWindow(_ window: NSWindow) -> Bool {
+        guard !(window is NSPanel) else { return false }
+        let typeName = String(describing: type(of: window))
+        if typeName.contains("StatusBar") || typeName.contains("MenuBar") || typeName.contains("Popup") || typeName.contains("Popover") {
+            return false
+        }
+        if window.className.contains("StatusBar") || window.className.contains("MenuBar") {
+            return false
+        }
+        return window.canBecomeMain || window.title.contains("Murmur") || window.identifier?.rawValue == "main"
+    }
+
+    /// Listens for window close notifications to switch to background accessory mode when no document windows remain.
     private func observeWindowVisibility() {
         NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
@@ -122,7 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     func checkVisibleWindowsAndAdjustPolicy() {
         let visibleWindows = NSApp.windows.filter { window in
-            !(window is NSPanel) && window.isVisible && window.canBecomeMain
+            Self.isDocumentWindow(window) && window.isVisible
         }
         if visibleWindows.isEmpty {
             NSApp.setActivationPolicy(.accessory)
@@ -132,7 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Closes all open document windows and hides the app from the Dock and ⌘Tab switcher.
     @MainActor
     static func closeAllWindowsAndHideFromDock() {
-        for window in NSApp.windows where !(window is NSPanel) {
+        for window in NSApp.windows where isDocumentWindow(window) {
             window.close()
         }
         NSApp.setActivationPolicy(.accessory)
@@ -142,10 +156,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     static func showMainWindow() {
         NSApp.setActivationPolicy(.regular)
-        if let existing = NSApp.windows.first(where: { !($0 is NSPanel) && ($0.title.contains("Murmur") || $0.identifier?.rawValue == "main") }) {
+        if let existing = NSApp.windows.first(where: { isDocumentWindow($0) }) {
             existing.makeKeyAndOrderFront(nil)
         }
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        return false
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
