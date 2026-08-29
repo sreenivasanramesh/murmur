@@ -1,0 +1,216 @@
+name: CI & Release
+
+# Builds, tests and publishes Murmur on macOS and Windows.
+# - On every pull request: runs full test suites and builds across both platforms.
+# - On push to main (or version tag): runs all tests, builds binaries, and publishes a GitHub Release.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-macos:
+    name: macOS (Build & Test)
+    runs-on: macos-15
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Package.swift declares swift-tools-version 6.2, but the runner defaults to an
+      # older Xcode (Swift 6.1) and fails to even parse the manifest. Select the newest
+      # Xcode present rather than pinning a version that will age out of the image.
+      - name: Select the newest Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using $latest"
+          sudo xcode-select -s "$latest/Contents/Developer"
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Confirm dictionary vectors are synchronized
+        run: |
+          if ! diff -q shared/dictionary-test-vectors.json Tests/MurmurDictionaryTests/dictionary-test-vectors.json; then
+            echo "::error::The Swift test copy of the vectors has drifted from shared/."
+            echo "Run: cp shared/dictionary-test-vectors.json Tests/MurmurDictionaryTests/"
+            exit 1
+          fi
+          echo "Vectors match."
+
+      - name: Run Swift tests
+        run: swift test --filter VectorTests
+
+      - name: Build macOS Release App
+        run: make app CONFIG=release
+
+      - name: Package macOS App Bundle
+        run: |
+          # Use ditto to preserve bundle structure, symlinks, codesigning attributes and metadata
+          ditto -c -k --keepParent "$HOME/Library/Caches/MurmurBuild/Murmur.app" Murmur-macOS.zip
+          ls -lh Murmur-macOS.zip
+
+      - name: Upload macOS App artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Murmur-macOS
+          path: Murmur-macOS.zip
+          if-no-files-found: error
+
+  build-test-windows:
+    name: Windows (Build & Test)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: windows
+
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: windows/global.json
+
+      - name: Environment diagnostics
+        shell: pwsh
+        run: |
+          dotnet --info
+          Get-PSDrive -PSProvider FileSystem |
+            Select-Object Name, @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}}
+
+      - name: Restore
+        run: dotnet restore Murmur.sln
+
+      # --no-incremental is REQUIRED: Roslyn analyzer warnings are not re-emitted on an
+      # incremental build, so -warnaserror would pass on cached results.
+      - name: Build (warnings are errors)
+        run: >
+          dotnet build Murmur.sln
+          --no-restore
+          --configuration Release
+          --no-incremental
+          -warnaserror
+          -bl:artifacts/build.binlog
+
+      - name: Test (63 tests)
+        run: >
+          dotnet test Murmur.sln
+          --no-build
+          --configuration Release
+          --logger "trx;LogFileName=results.trx"
+          --logger "console;verbosity=normal"
+          --results-directory artifacts/test-results
+
+      # The published exe is the only artifact CI can actually run, and a runner cannot
+      # show a window — so --selftest exercises startup, native library resolution out of
+      # the self-extracted bundle, and model discovery, then exits.
+      - name: Publish and smoke-test Windows exe
+        shell: pwsh
+        run: |
+          dotnet publish src/Murmur.App/Murmur.App.csproj `
+            --configuration Release --runtime win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+            --output artifacts/publish
+          $exe = 'artifacts/publish/Murmur.App.exe'
+          if (-not (Test-Path $exe)) { throw "Published exe not found at $exe" }
+          $size = [math]::Round((Get-Item $exe).Length / 1MB, 1)
+          Write-Host "published: $size MB"
+          $run = Start-Process -FilePath $exe -ArgumentList '--selftest' -Wait -PassThru -NoNewWindow
+          if ($run.ExitCode -ne 0) { throw "self-test failed with exit code $($run.ExitCode)" }
+
+      - name: Package Windows Release Zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path artifacts/publish/* -DestinationPath artifacts/publish/Murmur-windows-x64.zip -Force
+          $zipSize = [math]::Round((Get-Item artifacts/publish/Murmur-windows-x64.zip).Length / 1MB, 1)
+          Write-Host "Windows package created: artifacts/publish/Murmur-windows-x64.zip ($zipSize MB)"
+
+      - name: Upload Windows package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Murmur-windows-x64
+          path: windows/artifacts/publish/Murmur-windows-x64.zip
+          if-no-files-found: error
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-results
+          path: windows/artifacts/test-results
+          if-no-files-found: warn
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build-binlog
+          path: windows/artifacts/build.binlog
+          if-no-files-found: ignore
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-test-macos, build-test-windows]
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download macOS build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Murmur-macOS
+          path: release-assets
+
+      - name: Download Windows build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Murmur-windows-x64
+          path: release-assets
+
+      - name: Compute release tag and title
+        id: vars
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            TITLE="Murmur ${TAG}"
+          else
+            PLIST_VERSION=$(grep -A1 'CFBundleShortVersionString' Resources/Info.plist | grep '<string>' | sed -E 's/.*<string>(.*)<\/string>.*/\1/' || echo "0.1.0")
+            TAG="v${PLIST_VERSION}-build.${{ github.run_number }}"
+            TITLE="Murmur v${PLIST_VERSION} (Build ${{ github.run_number }})"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "title=${TITLE}" >> "$GITHUB_OUTPUT"
+          echo "Release Tag: ${TAG}"
+          echo "Release Title: ${TITLE}"
+
+      - name: Publish Release to GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: ${{ steps.vars.outputs.title }}
+          files: |
+            release-assets/Murmur-macOS.zip
+            release-assets/Murmur-windows-x64.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
