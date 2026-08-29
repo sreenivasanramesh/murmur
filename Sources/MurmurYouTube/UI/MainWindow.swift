@@ -501,6 +501,27 @@ struct SettingsPanelView: View {
                         }
                     }
                 }
+
+                // Group 5: System & Startup
+                settingCard(title: "System & Startup", description: "Configure system startup behavior.") {
+                    HStack(alignment: .center) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Open at login")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(DS.Color.ink)
+                            Text("Automatically launches Murmur in the background when you log in.")
+                                .font(.system(size: 11))
+                                .foregroundStyle(DS.Color.inkSecondary)
+                        }
+                        Spacer()
+                        Toggle("", isOn: Binding(
+                            get: { settings.launchAtLogin },
+                            set: { settings.launchAtLogin = $0 }
+                        ))
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                    }
+                }
             }
             .padding(DS.Space.roomy)
         }

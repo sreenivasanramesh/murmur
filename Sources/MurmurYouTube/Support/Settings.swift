@@ -1,6 +1,7 @@
 import Carbon.HIToolbox
 import Foundation
 import Observation
+import ServiceManagement
 
 /// Which speech engine transcribes an utterance.
 enum SpeechEngineChoice: String, CaseIterable, Sendable {
@@ -93,6 +94,35 @@ final class Settings {
         didSet { defaults.set(soundEnabled, forKey: Keys.soundEnabled) }
     }
 
+    /// Automatically launches Murmur in the background when the user logs in.
+    var launchAtLogin: Bool {
+        get {
+            if #available(macOS 13.0, *) {
+                return SMAppService.mainApp.status == .enabled
+            } else {
+                return defaults.bool(forKey: Keys.launchAtLogin)
+            }
+        }
+        set {
+            if #available(macOS 13.0, *) {
+                do {
+                    if newValue {
+                        if SMAppService.mainApp.status != .enabled {
+                            try SMAppService.mainApp.register()
+                        }
+                    } else {
+                        if SMAppService.mainApp.status == .enabled {
+                            try SMAppService.mainApp.unregister()
+                        }
+                    }
+                } catch {
+                    Log.app.error("Failed to update launch at login: \(error.localizedDescription)")
+                }
+            }
+            defaults.set(newValue, forKey: Keys.launchAtLogin)
+        }
+    }
+
     private let defaults = UserDefaults.standard
 
     private enum Keys {
@@ -104,6 +134,7 @@ final class Settings {
         static let engine = "engine"
         static let smartCleanup = "smartCleanup"
         static let compareMode = "compareMode"
+        static let launchAtLogin = "launchAtLogin"
     }
 
     private init() {

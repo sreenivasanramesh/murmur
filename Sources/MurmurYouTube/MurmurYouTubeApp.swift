@@ -1,4 +1,5 @@
 import AppKit
+import ServiceManagement
 import SwiftUI
 
 @main
@@ -14,12 +15,19 @@ struct MurmurYouTubeApp: App {
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 860, height: 620)
         .windowResizability(.contentMinSize)
+        .handlesExternalEvents(matching: Set(["main", "open"]))
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(after: .appInfo) {
                 Button("Reveal Dictionary File") {
                     NSWorkspace.shared.activateFileViewerSelecting([DictionaryStore.fileURL])
                 }
+            }
+            CommandGroup(replacing: .saveItem) {
+                Button("Close Window") {
+                    AppDelegate.closeAllWindowsAndHideFromDock()
+                }
+                .keyboardShortcut("w", modifiers: .command)
             }
         }
 
@@ -59,9 +67,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // A regular app now: dock icon, app menu, standard windows. The HUD is still a
-        // non-activating panel, so dictating into another app never steals its focus — that
-        // property belongs to the panel, not to the activation policy.
+        // Enable open at login by default on first launch
+        if !UserDefaults.standard.bool(forKey: "hasConfiguredLaunchAtLogin") {
+            UserDefaults.standard.set(true, forKey: "hasConfiguredLaunchAtLogin")
+            if #available(macOS 13.0, *) {
+                try? SMAppService.mainApp.register()
+            }
+        }
+
+        // A regular app on initial launch with standard windows and dock icon.
         NSApp.setActivationPolicy(.regular)
 
         hud = HUDPanel(controller: controller)
@@ -102,7 +116,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         observeState()
+        observeWindowVisibility()
         Log.app.info("Murmur ready — hold \(Settings.shared.pushToTalkKey.displayName) to dictate")
+    }
+
+    /// Listens for window close notifications to switch to background accessory mode when no windows remain.
+    private func observeWindowVisibility() {
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(50))
+                self?.checkVisibleWindowsAndAdjustPolicy()
+            }
+        }
+    }
+
+    @MainActor
+    func checkVisibleWindowsAndAdjustPolicy() {
+        let visibleWindows = NSApp.windows.filter { window in
+            !(window is NSPanel) && window.isVisible && window.canBecomeMain
+        }
+        if visibleWindows.isEmpty {
+            NSApp.setActivationPolicy(.accessory)
+        }
+    }
+
+    /// Closes all open document windows and hides the app from the Dock and ⌘Tab switcher.
+    @MainActor
+    static func closeAllWindowsAndHideFromDock() {
+        for window in NSApp.windows where !(window is NSPanel) {
+            window.close()
+        }
+        NSApp.setActivationPolicy(.accessory)
+    }
+
+    /// Raises the main window and restores regular Dock and ⌘Tab presence.
+    @MainActor
+    static func showMainWindow() {
+        NSApp.setActivationPolicy(.regular)
+        if let existing = NSApp.windows.first(where: { !($0 is NSPanel) && ($0.title.contains("Murmur") || $0.identifier?.rawValue == "main") }) {
+            existing.makeKeyAndOrderFront(nil)
+        }
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        Self.showMainWindow()
+        return true
     }
 
     /// `murmuryt://clear` and `murmuryt://show`, used by the legacy HTML dashboard and
@@ -115,6 +178,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 RunStore.shared.reload()
             case "show":
                 Self.showComparisonWindow()
+            case "main", "open":
+                Self.showMainWindow()
             default:
                 break
             }
@@ -124,6 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Raises the comparison window without needing SwiftUI's `openWindow` environment
     /// value — usable from the app delegate and from a URL handler.
     static func showComparisonWindow() {
+        NSApp.setActivationPolicy(.regular)
         RunStore.shared.reload()
         if let existing = NSApp.windows.first(where: { $0.title == "Engine comparison" }) {
             existing.makeKeyAndOrderFront(nil)
@@ -185,6 +251,13 @@ private struct MenuContent: View {
     }
 
     var body: some View {
+        Button("Open Murmur") {
+            AppDelegate.showMainWindow()
+            openWindow(id: "main")
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        .keyboardShortcut("o")
+
         Text("Hold \(settings.pushToTalkKey.displayName) to dictate")
 
         Divider()
@@ -230,6 +303,11 @@ private struct MenuContent: View {
         }
 
         Toggle("Sound", isOn: $settings.soundEnabled)
+
+        Toggle("Open at login", isOn: Binding(
+            get: { settings.launchAtLogin },
+            set: { settings.launchAtLogin = $0 }
+        ))
 
         Divider()
 
