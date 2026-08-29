@@ -51,6 +51,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var stateObservation: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if CommandLine.arguments.contains("--benchmark-cleanup") {
+            Task {
+                await CleanupBenchmark.run()
+                exit(0)
+            }
+            return
+        }
+
         // A regular app now: dock icon, app menu, standard windows. The HUD is still a
         // non-activating panel, so dictating into another app never steals its focus — that
         // property belongs to the panel, not to the activation policy.
@@ -193,7 +201,7 @@ private struct MenuContent: View {
             }
         }
 
-        Toggle("Compare mode (both engines)", isOn: $settings.compareMode)
+        Toggle("Compare mode (all engines)", isOn: $settings.compareMode)
 
         if !settings.compareMode {
             Picker("Engine", selection: Binding(
@@ -214,7 +222,7 @@ private struct MenuContent: View {
         Toggle("Clean up text", isOn: $settings.cleanupEnabled)
 
         if settings.cleanupEnabled {
-            Toggle("Smart cleanup (on-device AI)", isOn: $settings.smartCleanup)
+            Toggle("Smart AI cleanup (Experimental)", isOn: $settings.smartCleanup)
                 .disabled(!FoundationModelFormatter.isAvailable)
             if let reason = FoundationModelFormatter.unavailableReason {
                 Text(reason).font(.caption)

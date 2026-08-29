@@ -6,11 +6,13 @@ import Observation
 enum SpeechEngineChoice: String, CaseIterable, Sendable {
     case apple
     case parakeet
+    case parakeetStreaming
 
     var displayName: String {
         switch self {
         case .apple: "Apple (streaming)"
         case .parakeet: "Parakeet (batch)"
+        case .parakeetStreaming: "Parakeet (streaming · experimental)"
         }
     }
 
@@ -18,13 +20,14 @@ enum SpeechEngineChoice: String, CaseIterable, Sendable {
         switch self {
         case .apple: "Apple"
         case .parakeet: "Parakeet"
+        case .parakeetStreaming: "Parakeet Stream"
         }
     }
 
-    /// Apple shows text while you talk; Parakeet only resolves on release.
-    var showsLiveText: Bool { self == .apple }
+    /// Apple and Parakeet streaming show text while you talk; Parakeet batch only resolves on release.
+    var showsLiveText: Bool { self == .apple || self == .parakeetStreaming }
 
-    var requiresParakeetModel: Bool { self == .parakeet }
+    var requiresParakeetModel: Bool { self == .parakeet || self == .parakeetStreaming }
 }
 
 @MainActor

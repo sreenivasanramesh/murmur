@@ -19,29 +19,42 @@ struct HUDView: View {
     @Bindable var controller: DictationController
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .center, spacing: 14) {
             Waveform(level: controller.level, isActive: controller.state == .listening)
-                .frame(width: 64, height: 20)
+                .frame(width: 54, height: 24)
 
-            Text(label)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(isError ? Color.red : Color(red: 0.1, green: 0.1, blue: 0.15))
-                .lineLimit(2)
-                .truncationMode(.head)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .animation(.easeOut(duration: 0.12), value: controller.transcript)
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(label)
+                            .font(.system(size: 13.5, weight: .medium, design: .rounded))
+                            .foregroundStyle(isError ? Color.red : Color(red: 0.1, green: 0.1, blue: 0.15))
+                            .lineSpacing(3)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .id("streamTextBottom")
+                    }
+                    .frame(minHeight: 56, alignment: .center)
+                }
+                .frame(height: 56)
+                .onChange(of: controller.transcript) { _, _ in
+                    withAnimation(.easeOut(duration: 0.12)) {
+                        proxy.scrollTo("streamTextBottom", anchor: .bottom)
+                    }
+                }
+            }
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .frame(width: 320, height: 50)
+        .frame(width: 420, height: 80)
         .background {
-            Capsule()
-                .fill(Color(white: 0.98).opacity(0.96))
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color(white: 0.98).opacity(0.97))
                 .overlay(
-                    Capsule()
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .strokeBorder(Color.black.opacity(0.08), lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(0.12), radius: 14, y: 5)
+                .shadow(color: Color.black.opacity(0.12), radius: 16, y: 6)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)

@@ -17,6 +17,7 @@ func engineForCurrentSetting() -> any TranscriptionEngine {
         switch Settings.shared.engine {
         case .apple: AppleSpeechEngine()
         case .parakeet: ParakeetEngine()
+        case .parakeetStreaming: ParakeetStreamingEngine()
         }
     }
 }
@@ -142,6 +143,10 @@ final class DictationController {
         isComparing = Settings.shared.compareMode
         recorded.removeAll(keepingCapacity: true)
         engineName = isComparing ? "Comparing…" : Settings.shared.engine.displayName
+
+        if Settings.shared.cleanupEnabled {
+            FoundationModelFormatter.warmUp()
+        }
 
         Task { @MainActor in
             do {
@@ -331,7 +336,7 @@ final class DictationController {
             return
         }
 
-        transcript = "Running both engines…"
+        transcript = "Running all engines…"
 
         let group = UUID().uuidString
         let held = releasedAt.timeIntervalSince(holdStarted)

@@ -118,8 +118,8 @@ struct ComparisonWindow: View {
         if isRecording { return "Recording — click Stop when you're done talking." }
         if !controller.transcript.isEmpty { return controller.transcript }
         return WisprReader.isInstalled
-            ? "Click Record, talk, click Stop. Apple, Parakeet and Wispr Flow all hear it."
-            : "Click Record, talk, click Stop. Wispr Flow isn't installed, so it's Apple vs Parakeet."
+            ? "Click Record, talk, click Stop. Apple, Parakeet (Batch & Stream), and Wispr Flow all hear it."
+            : "Click Record, talk, click Stop. All engines run on the same audio."
     }
 
     private var emptyState: some View {
@@ -130,8 +130,8 @@ struct ComparisonWindow: View {
             Text("Hold \(settings.pushToTalkKey.displayName), say a sentence, let go.")
                 .font(.system(size: 15, weight: .semibold))
             Text(settings.compareMode
-                 ? "Both engines run on that one recording and appear here."
-                 : "Turn on Compare mode in the menu bar to see both engines at once.")
+                 ? "All engines run on that one recording and appear here."
+                 : "Turn on Compare mode in the menu bar to see all engines at once.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

@@ -27,7 +27,8 @@ enum EngineComparison {
         // timed in isolation and the *measured* durations are what get compared.
         for (name, engine) in [
             ("Apple", AppleSpeechEngine() as any TranscriptionEngine),
-            ("Parakeet", ParakeetEngine() as any TranscriptionEngine),
+            ("Parakeet (Batch)", ParakeetEngine() as any TranscriptionEngine),
+            ("Parakeet (Streaming)", ParakeetStreamingEngine() as any TranscriptionEngine),
         ] {
             let result = await measure(name: name, engine: engine, chunks: chunks)
             results.append(result)

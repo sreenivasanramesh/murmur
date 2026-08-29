@@ -405,7 +405,7 @@ struct SettingsPanelView: View {
                 // Group 3: Speech Recognition Engine
                 settingCard(title: "Speech Recognition Engine", description: "Choose between on-device live streaming or Neural Engine batch accuracy.") {
                     VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 12) {
+                        HStack(spacing: 10) {
                             // Apple Speech Card
                             engineCard(
                                 title: "Apple Speech",
@@ -417,15 +417,27 @@ struct SettingsPanelView: View {
                                 settings.engine = .apple
                             }
 
-                            // Parakeet Card
+                            // Parakeet Batch Card
                             engineCard(
-                                title: "NVIDIA Parakeet",
+                                title: "Parakeet (Batch)",
                                 badge: "ANE Batch • 100×",
                                 badgeColor: DS.Color.accent,
                                 description: "Transcribes complete utterance in ~0.1s on Apple Neural Engine on release with maximal accuracy.",
                                 isSelected: settings.engine == .parakeet
                             ) {
                                 settings.engine = .parakeet
+                                downloadManager.startDownloadIfNeeded()
+                            }
+
+                            // Parakeet Streaming Card
+                            engineCard(
+                                title: "Parakeet (Stream)",
+                                badge: "ANE Stream • Beta",
+                                badgeColor: DS.Color.accent,
+                                description: "Streams partial words in real-time on Apple Neural Engine using sliding-window inference.",
+                                isSelected: settings.engine == .parakeetStreaming
+                            ) {
+                                settings.engine = .parakeetStreaming
                                 downloadManager.startDownloadIfNeeded()
                             }
                         }
@@ -458,12 +470,11 @@ struct SettingsPanelView: View {
 
                         HStack(alignment: .center) {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("Smart AI cleanup")
+                                Text("Smart AI cleanup (Experimental)")
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundStyle(DS.Color.ink)
-                                Text("Uses on-device Apple Foundation Models to improve grammar.")
+                                Text("\(Text("Uses on-device Apple Foundation Models to improve grammar and formatting. ").foregroundStyle(DS.Color.inkSecondary))\(Text("Increases latency.").foregroundStyle(settings.smartCleanup ? DS.Color.record : DS.Color.inkSecondary))")
                                     .font(.system(size: 11))
-                                    .foregroundStyle(DS.Color.inkSecondary)
                             }
                             Spacer()
                             Toggle("", isOn: $settings.smartCleanup)
