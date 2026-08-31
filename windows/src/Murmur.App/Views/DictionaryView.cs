@@ -75,18 +75,9 @@ public sealed class DictionaryView : UserControl
         foreach (var entry in entries) _list.Children.Add(BuildRow(entry));
     }
 
-    private Border BuildRow(DictionaryEntry entry)
+    private static StackPanel BuildLeftPanel(DictionaryEntry entry)
     {
-        var edit = Panels.DeckButton("EDIT");
-        edit.Click += (_, _) => ShowEditor(entry);
-
-        var toggle = Panels.DeckButton(entry.IsEnabled ? "OFF" : "ON");
-        toggle.Click += (_, _) => _file.Update(entry with { IsEnabled = !entry.IsEnabled });
-
-        var delete = Panels.DeckButton("DELETE");
-        delete.Click += (_, _) => _file.Remove(entry.Id);
-
-        var left = new StackPanel
+        return new StackPanel
         {
             Orientation = Orientation.Horizontal,
             Spacing = Tokens.Space.Base,
@@ -120,14 +111,32 @@ public sealed class DictionaryView : UserControl
                 },
             },
         };
+    }
 
-        var right = new StackPanel
+    private StackPanel BuildRightPanel(DictionaryEntry entry)
+    {
+        var edit = Panels.DeckButton("EDIT");
+        edit.Click += (_, _) => ShowEditor(entry);
+
+        var toggle = Panels.DeckButton(entry.IsEnabled ? "OFF" : "ON");
+        toggle.Click += (_, _) => _file.Update(entry with { IsEnabled = !entry.IsEnabled });
+
+        var delete = Panels.DeckButton("DELETE");
+        delete.Click += (_, _) => _file.Remove(entry.Id);
+
+        return new StackPanel
         {
             Orientation = Orientation.Horizontal,
             Spacing = Tokens.Space.Tight,
             HorizontalAlignment = HorizontalAlignment.Right,
             Children = { edit, toggle, delete },
         };
+    }
+
+    private Border BuildRow(DictionaryEntry entry)
+    {
+        var left = BuildLeftPanel(entry);
+        var right = BuildRightPanel(entry);
 
         return new Border
         {
