@@ -16,15 +16,37 @@ enum DashboardHTML {
               \(runsTable(runs.reversed()))
               """
 
-        return """
-        <!doctype html>
-        <html lang="en"><head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <!-- The app rewrites this file after every dictation; the page just reloads. -->
-        <meta http-equiv="refresh" content="3">
-        <title>Murmur — Dictation History</title>
-        <style>
+        return Template.page(runCount: runs.count, isEmpty: runs.isEmpty, body: body)
+    }
+
+    private enum Template {
+        static func page(runCount: Int, isEmpty: Bool, body: String) -> String {
+            """
+            <!doctype html>
+            <html lang="en"><head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <!-- The app rewrites this file after every dictation; the page just reloads. -->
+            <meta http-equiv="refresh" content="3">
+            <title>Murmur — Dictation History</title>
+            <style>
+            \(css)
+            </style></head><body><div class="wrap">
+            <h1>Dictation History</h1>
+            <div class="bar">
+              <div class="sub"><span class="dot"></span>live — reloads every 3s · \(runCount) dictation\(runCount == 1 ? "" : "s") recorded</div>
+              \(isEmpty ? "" : "<a class=\"btn\" href=\"murmuryt://clear\">Clear results</a>")
+            </div>
+            \(body)
+            <footer>
+              Process time is release → text ready: the latency you actually feel. RTF is hold
+              duration ÷ process time.
+            </footer>
+            </div></body></html>
+            """
+        }
+
+        static let css = """
         :root{--bg:#fbfbfd;--panel:#fff;--ink:#1d1d1f;--muted:#6e6e73;--line:#e3e3e8;
               --accent:#6b8cff;--accent2:#c278ff;--good:#1a9c5b;}
         @media (prefers-color-scheme:dark){:root{--bg:#0f0f12;--panel:#18181d;--ink:#f2f2f5;
@@ -89,18 +111,6 @@ enum DashboardHTML {
         .pill.win{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
         .meta{color:var(--muted);font-size:11.5px;margin-bottom:9px}
         .out{font-size:14px;line-height:1.55;overflow-wrap:anywhere}
-        </style></head><body><div class="wrap">
-        <h1>Dictation History</h1>
-        <div class="bar">
-          <div class="sub"><span class="dot"></span>live — reloads every 3s · \(runs.count) dictation\(runs.count == 1 ? "" : "s") recorded</div>
-          \(runs.isEmpty ? "" : "<a class=\"btn\" href=\"murmuryt://clear\">Clear results</a>")
-        </div>
-        \(body)
-        <footer>
-          Process time is release → text ready: the latency you actually feel. RTF is hold
-          duration ÷ process time.
-        </footer>
-        </div></body></html>
         """
     }
 
