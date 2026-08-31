@@ -22,6 +22,27 @@ struct RuleBasedFormatter: TextFormatter {
         )
     }()
 
+    private struct TransitionRule {
+        let word: String
+        let capitalizedWord: String
+        let midRegex: NSRegularExpression
+        let startRegex: NSRegularExpression
+
+        init(word: String) {
+            self.word = word
+            self.capitalizedWord = word.capitalized
+            let midPattern = "(?<=[\\w])\\s+\(word)\\s+"
+            self.midRegex = try! NSRegularExpression(pattern: midPattern)
+
+            let startPattern = "(?i)(?:^|(?<=[.!?\\n]\\s))(\(word))\\s+(?!,)"
+            self.startRegex = try! NSRegularExpression(pattern: startPattern)
+        }
+    }
+
+    private static let transitionRules: [TransitionRule] = [
+        "however", "therefore", "furthermore", "moreover", "meanwhile"
+    ].map { TransitionRule(word: $0) }
+
     func format(_ raw: String) async -> String {
         var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return text }
@@ -66,21 +87,19 @@ struct RuleBasedFormatter: TextFormatter {
     private func formatTransitions(in text: String) -> String {
         var result = text
         // Format discourse transitions like "however", "therefore", "furthermore"
-        let transitionWords = ["however", "therefore", "furthermore", "moreover", "meanwhile"]
-        for word in transitionWords {
-            // If preceded by a space and not punctuation, add period and capitalize
-            let midPattern = "(?<=[\\w])\\s+\(word)\\s+"
-            result = result.replacingOccurrences(
-                of: midPattern,
-                with: ". \(word.capitalized), ",
-                options: .regularExpression
+        for rule in Self.transitionRules {
+            let midRange = NSRange(result.startIndex..<result.endIndex, in: result)
+            result = rule.midRegex.stringByReplacingMatches(
+                in: result,
+                range: midRange,
+                withTemplate: ". \(rule.capitalizedWord), "
             )
-            // If at start of sentence/string without trailing comma, add comma
-            let startPattern = "(?i)(?:^|(?<=[.!?\\n]\\s))(\(word))\\s+(?!,)"
-            result = result.replacingOccurrences(
-                of: startPattern,
-                with: "$1, ",
-                options: .regularExpression
+
+            let startRange = NSRange(result.startIndex..<result.endIndex, in: result)
+            result = rule.startRegex.stringByReplacingMatches(
+                in: result,
+                range: startRange,
+                withTemplate: "$1, "
             )
         }
         return result
