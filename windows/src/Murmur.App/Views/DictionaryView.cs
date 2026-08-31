@@ -167,7 +167,7 @@ public sealed class DictionaryView : UserControl
             }
 
             using var process = new System.Diagnostics.Process();
-            process.StartInfo = new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true };
+            process.StartInfo = new System.Diagnostics.ProcessStartInfo("notepad.exe", $"\"{path}\"") { UseShellExecute = false };
             process.Start();
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException or UnauthorizedAccessException)
