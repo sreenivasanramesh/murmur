@@ -12,6 +12,7 @@ import FoundationModels
 /// - **Bounded & Low Latency.** Compact prompt, dynamic token capping, and greedy decoding.
 /// - **Guarded.** Output is rejected if it looks like the model answered the text instead
 ///   of cleaning it.
+@available(macOS 26.0, *)
 struct FoundationModelFormatter: TextFormatter {
     /// Deterministic fallback used on timeout, unavailability, or a rejected response.
     private let fallback = RuleBasedFormatter()
