@@ -1,6 +1,41 @@
 import FluidAudio
 import Foundation
 import Observation
+import os
+
+/// Rate-limits high-frequency progress callbacks to a smooth UI frame cadence (~12 fps)
+/// while guaranteeing immediate emission on phase / stage transitions.
+private final class ProgressThrottler: @unchecked Sendable {
+    private let interval: TimeInterval
+    private var lastEmission: ContinuousClock.Instant = .now - .seconds(10)
+    private var lastFraction: Double = -1
+    private var lastStage: String = ""
+    private let lock = NSLock()
+
+    init(interval: TimeInterval = 0.08) {
+        self.interval = interval
+    }
+
+    func shouldEmit(fraction: Double, stage: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+
+        if stage != lastStage {
+            lastStage = stage
+            lastEmission = .now
+            lastFraction = fraction
+            return true
+        }
+
+        let elapsed = ContinuousClock.now - lastEmission
+        if elapsed >= .milliseconds(Int(interval * 1000)) && abs(fraction - lastFraction) >= 0.005 {
+            lastEmission = .now
+            lastFraction = fraction
+            return true
+        }
+        return false
+    }
+}
 
 /// Manages background download and initialization of Parakeet CoreML models.
 @MainActor
@@ -61,39 +96,52 @@ final class ParakeetDownloadManager {
         status = .downloading(progress: 0.05, stage: "Starting download (~470 MB)...")
 
         activeTask?.cancel()
-        activeTask = Task {
+        let manager = self
+        activeTask = Task.detached(priority: .utility) {
+            let throttler = ProgressThrottler(interval: 0.08)
             do {
                 Log.speech.info("ParakeetDownloadManager: starting download and load...")
                 let models = try await AsrModels.downloadAndLoad(
                     version: .v3,
                     encoderPrecision: .int8,
-                    progressHandler: { [weak self] progress in
-                        Task { @MainActor in
-                            let fraction = max(0.05, min(0.95, progress.fractionCompleted))
-                            let stage: String
-                            switch progress.phase {
-                            case .listing:
-                                stage = "Connecting to repository..."
-                            case .downloading(let completed, let total):
-                                stage = total > 0 ? "Downloading files (\(completed)/\(total))..." : "Downloading model weights..."
-                            case .compiling(let modelName):
-                                stage = "Compiling \(modelName) on Neural Engine..."
+                    progressHandler: { progress in
+                        let fraction = max(0.05, min(0.95, progress.fractionCompleted))
+                        let stage: String
+                        switch progress.phase {
+                        case .listing:
+                            stage = "Connecting to repository..."
+                        case .downloading(let completed, let total):
+                            stage = total > 0 ? "Downloading files (\(completed)/\(total))..." : "Downloading model weights..."
+                        case .compiling(let modelName):
+                            stage = "Compiling \(modelName) on Neural Engine..."
+                        }
+
+                        if throttler.shouldEmit(fraction: fraction, stage: stage) {
+                            Task { @MainActor in
+                                manager.status = .downloading(progress: fraction, stage: stage)
                             }
-                            self?.status = .downloading(progress: fraction, stage: stage)
                         }
                     }
                 )
 
+                guard !Task.isCancelled else { return }
+
                 // Cache in memory so next dictation is instantaneous
                 await ParakeetModels.shared.setLoadedModels(models)
 
-                self.status = .downloaded
+                await MainActor.run {
+                    manager.status = .downloaded
+                    manager.activeTask = nil
+                }
                 Log.speech.info("ParakeetDownloadManager: download and initialization complete")
             } catch {
+                guard !Task.isCancelled else { return }
                 Log.speech.error("ParakeetDownloadManager failed: \(error.localizedDescription)")
-                self.status = .failed(error.localizedDescription)
+                await MainActor.run {
+                    manager.status = .failed(error.localizedDescription)
+                    manager.activeTask = nil
+                }
             }
-            self.activeTask = nil
         }
     }
 }
