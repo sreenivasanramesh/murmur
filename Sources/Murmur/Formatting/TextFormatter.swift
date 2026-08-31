@@ -9,6 +9,19 @@ protocol TextFormatter: Sendable {
 struct RuleBasedFormatter: TextFormatter {
     private static let fillers = ["um", "uh", "erm", "uhm", "hmm", "mhm"]
 
+    private static let fillerRegexes: [NSRegularExpression] = {
+        fillers.compactMap { filler in
+            try? NSRegularExpression(pattern: "(?i)(?<![\\w'])\(filler)\\b,?", options: [])
+        }
+    }()
+
+    private static let stackedFillerRegex: NSRegularExpression? = {
+        try? NSRegularExpression(
+            pattern: "(?i)(?:^|(?<=[.!?\\n]\\s))(?:so\\s+basically|basically|like|so|um|uh|no\\s+wait|wait|make\\s+that)[,\\s]+",
+            options: []
+        )
+    }()
+
     func format(_ raw: String) async -> String {
         var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return text }
@@ -25,25 +38,27 @@ struct RuleBasedFormatter: TextFormatter {
 
     private func stripFillers(from text: String) -> String {
         var result = text
-        for filler in Self.fillers {
-            let pattern = "(?i)(?<![\\w'])\(filler)\\b,?"
-            result = result.replacingOccurrences(
-                of: pattern,
-                with: "",
-                options: .regularExpression
+        for regex in Self.fillerRegexes {
+            result = regex.stringByReplacingMatches(
+                in: result,
+                options: [],
+                range: NSRange(result.startIndex..., in: result),
+                withTemplate: ""
             )
         }
         // Repeatedly strip stacked leading filler phrases and restart markers at start of string or after sentence boundary
-        var previous = ""
-        while previous != result {
-            previous = result
-            result = result
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .replacingOccurrences(
-                    of: "(?i)(?:^|(?<=[.!?\\n]\\s))(?:so\\s+basically|basically|like|so|um|uh|no\\s+wait|wait|make\\s+that)[,\\s]+",
-                    with: "",
-                    options: .regularExpression
+        if let stackedRegex = Self.stackedFillerRegex {
+            var previous = ""
+            while previous != result {
+                previous = result
+                let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
+                result = stackedRegex.stringByReplacingMatches(
+                    in: trimmed,
+                    options: [],
+                    range: NSRange(trimmed.startIndex..., in: trimmed),
+                    withTemplate: ""
                 )
+            }
         }
         return result
     }
