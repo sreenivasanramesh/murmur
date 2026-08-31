@@ -181,8 +181,7 @@ struct FoundationModelFormatter: TextFormatter {
                 continue
             }
 
-            let pattern = "(?<=[.!?])\\s+"
-            if let regex = try? NSRegularExpression(pattern: pattern) {
+            if let regex = Self.sentenceSplitRegex {
                 let nsString = trimmedLine as NSString
                 let matches = regex.matches(in: trimmedLine, range: NSRange(location: 0, length: nsString.length))
                 var lastLocation = 0
@@ -355,6 +354,10 @@ struct FoundationModelFormatter: TextFormatter {
         "just", "really", "okay", "ok", "well", "right", "anyway", "i", "mean", "you", "know",
         "kind", "sort", "of", "stuff", "thing", "things",
     ]
+
+    private static let sentenceSplitRegex: NSRegularExpression? = {
+        try? NSRegularExpression(pattern: "(?<=[.!?])\\s+")
+    }()
 
     private enum CleanupError: LocalizedError {
         case timedOut
