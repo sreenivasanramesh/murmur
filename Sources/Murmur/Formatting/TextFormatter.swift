@@ -189,10 +189,24 @@ struct RuleBasedFormatter: TextFormatter {
         return formattedLines.joined(separator: "\n")
     }
 
+    private static let regexCacheLock = NSLock()
+    nonisolated(unsafe) private static var regexCache: [String: NSRegularExpression] = [:]
+
     private func firstMatch(for pattern: String, in text: String) -> [String: String]? {
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return nil }
+        Self.regexCacheLock.lock()
+        var regex = Self.regexCache[pattern]
+        Self.regexCacheLock.unlock()
+
+        if regex == nil {
+            guard let newRegex = try? NSRegularExpression(pattern: pattern, options: []) else { return nil }
+            regex = newRegex
+            Self.regexCacheLock.lock()
+            Self.regexCache[pattern] = newRegex
+            Self.regexCacheLock.unlock()
+        }
+
         let nsString = text as NSString
-        let matches = regex.matches(in: text, options: [], range: NSRange(location: 0, length: nsString.length))
+        let matches = regex!.matches(in: text, options: [], range: NSRange(location: 0, length: nsString.length))
         guard let match = matches.first else { return nil }
 
         var result: [String: String] = [:]
