@@ -1,4 +1,6 @@
+import AudioToolbox
 import AVFoundation
+import CoreAudio
 import Foundation
 
 /// Microphone capture with on-the-fly conversion to whatever format the speech engine wants.
@@ -18,6 +20,7 @@ final class AudioCapture: @unchecked Sendable {
 
     func start(
         outputFormat: AVAudioFormat,
+        deviceID: AudioDeviceID? = nil,
         onBuffer: @escaping @Sendable (AudioChunk) -> Void,
         onLevel: @escaping @Sendable (Float) -> Void
     ) throws {
@@ -26,6 +29,22 @@ final class AudioCapture: @unchecked Sendable {
         self.onBuffer = onBuffer
         self.onLevel = onLevel
         self.outputFormat = outputFormat
+
+        // Route input node to designated device if specified
+        if let deviceID, let audioUnit = engine.inputNode.audioUnit {
+            var devID = deviceID
+            let status = AudioUnitSetProperty(
+                audioUnit,
+                kAudioOutputUnitProperty_CurrentDevice,
+                kAudioUnitScope_Global,
+                0,
+                &devID,
+                UInt32(MemoryLayout<AudioDeviceID>.size)
+            )
+            if status != noErr {
+                Log.audio.error("could not route input node to device ID \(deviceID): status \(status)")
+            }
+        }
 
         let input = engine.inputNode
         let nativeFormat = input.outputFormat(forBus: 0)

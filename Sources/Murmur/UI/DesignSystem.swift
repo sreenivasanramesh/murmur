@@ -2,19 +2,9 @@ import SwiftUI
 
 /// The design system for Murmur.
 ///
-/// Direction: 1980s portable field recorders and cassette decks — Sony TC-D5, Marantz PMD,
-/// Nakamichi, Braun. Equipment, not theme. Every value a view needs lives here; components
-/// never declare their own colors, sizes, radii or durations.
-///
-/// Two faces, the way decks actually shipped: **silver face** (brushed aluminum, the TC-D5)
-/// in light appearance, **black face** (matte, the PMD) in dark. Same tokens, same names,
-/// different material — so a view is written once and both faces work.
-///
-/// The rules that keep this from drifting into pastiche:
-/// - One accent: the record lamp red. Nothing else in the app is red.
-/// - Amber and green appear only on level instrumentation, never as UI color.
-/// - Radii stay small. Equipment has hard edges and visible seams.
-/// - Depth comes from bevels and inset shadows, never from glow or blur.
+/// Clean, minimalist, modern UI design tokens.
+/// Every value a view needs lives here; components never declare their own colors, sizes,
+/// radii or durations.
 enum DS {
 
     // MARK: - Color

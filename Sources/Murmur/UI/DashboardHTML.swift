@@ -1,26 +1,19 @@
 import Foundation
 
-/// Renders the live comparison page. Self-contained, theme-aware, auto-refreshing.
+/// Renders the live dictation history dashboard. Self-contained, theme-aware, auto-refreshing.
 enum DashboardHTML {
-    static func render(runs: [DictationRun], compareMode: Bool = false, key: String = "Right \u{2325}") -> String {
+    static func render(runs: [DictationRun], key: String = "Right \u{2325}") -> String {
         let byEngine = Dictionary(grouping: runs, by: \.engine)
         let summary = byEngine
             .map { engine, runs in EngineSummary(engine: engine, runs: runs) }
             .sorted { $0.engine < $1.engine }
 
-        // Comparison groups first — they're the reason this page exists.
-        let groups = Dictionary(grouping: runs.filter { $0.group != nil }, by: { $0.group! })
-            .sorted { ($0.value.first?.date ?? .distantPast) > ($1.value.first?.date ?? .distantPast) }
-        let ungrouped = runs.filter { $0.group == nil }
-
         let body = runs.isEmpty
-            ? emptyState(compareMode: compareMode, key: key)
+            ? emptyState(key: key)
             : """
-              \(groups.isEmpty ? "" : "<h2 class=\"sec\">Head to head</h2>")
-              \(groups.map { comparisonBlock(runs: $0.value) }.joined())
-              \(summary.isEmpty ? "" : "<h2 class=\"sec\">Overall</h2>")
+              \(summary.isEmpty ? "" : "<h2 class=\"sec\">Summary</h2>")
               <div class="grid">\(summary.map(summaryCard).joined())</div>
-              \(ungrouped.isEmpty ? "" : runsTable(ungrouped.reversed()))
+              \(runsTable(runs.reversed()))
               """
 
         return """
@@ -30,7 +23,7 @@ enum DashboardHTML {
         <meta name="viewport" content="width=device-width,initial-scale=1">
         <!-- The app rewrites this file after every dictation; the page just reloads. -->
         <meta http-equiv="refresh" content="3">
-        <title>Murmur — engine comparison</title>
+        <title>Murmur — Dictation History</title>
         <style>
         :root{--bg:#fbfbfd;--panel:#fff;--ink:#1d1d1f;--muted:#6e6e73;--line:#e3e3e8;
               --accent:#6b8cff;--accent2:#c278ff;--good:#1a9c5b;}
@@ -97,7 +90,7 @@ enum DashboardHTML {
         .meta{color:var(--muted);font-size:11.5px;margin-bottom:9px}
         .out{font-size:14px;line-height:1.55;overflow-wrap:anywhere}
         </style></head><body><div class="wrap">
-        <h1>Engine comparison</h1>
+        <h1>Dictation History</h1>
         <div class="bar">
           <div class="sub"><span class="dot"></span>live — reloads every 3s · \(runs.count) dictation\(runs.count == 1 ? "" : "s") recorded</div>
           \(runs.isEmpty ? "" : "<a class=\"btn\" href=\"murmuryt://clear\">Clear results</a>")
@@ -105,69 +98,20 @@ enum DashboardHTML {
         \(body)
         <footer>
           Process time is release → text ready: the latency you actually feel. RTF is hold
-          duration ÷ process time. Apple streams text while you talk, so its felt latency is
-          lower than these numbers suggest; Parakeet resolves everything on release.
+          duration ÷ process time.
         </footer>
         </div></body></html>
         """
     }
 
-    private static func emptyState(compareMode: Bool, key: String) -> String {
+    private static func emptyState(key: String) -> String {
         """
         <div class="panel empty">
           <p class="lead">Hold <kbd>\(escape(key))</kbd>, say a sentence, let go.</p>
-          <p>\(compareMode
-              ? "Both engines will run on that one recording and appear here side by side."
-              : "Compare mode is off — turn it on in the menu bar to see both engines at once.")</p>
+          <p>Your dictations will appear here.</p>
           <p class="hint">Nothing to click here. This page fills in on its own.</p>
         </div>
         """
-    }
-
-    /// One recording, every engine's take on it, laid out for direct reading.
-    private static func comparisonBlock(runs: [DictationRun]) -> String {
-        guard let first = runs.first else { return "" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-
-        let fastest = runs.min(by: { $0.processSeconds < $1.processSeconds })?.engine
-
-        // Compared on normalized text — case and punctuation differences aren't recognition
-        // errors, and Apple auto-punctuates while Parakeet doesn't. Hence "same words"
-        // rather than "identical text": the rendered strings can still look different.
-        let sameWords = Set(runs.map { normalized($0.text) }).count == 1
-        let exact = Set(runs.map(\.text)).count == 1
-        let verdict = exact ? "identical" : (sameWords ? "same words" : "words differ")
-
-        let columns = runs.map { run -> String in
-            let win = run.engine == fastest && runs.count > 1
-            return """
-            <div class="col">
-              <div class="colhead">
-                <span class="pill\(win ? " win" : "")">\(escape(run.engine))\(win ? " · fastest" : "")</span>
-                <span class="num big">\(fmt(run.processSeconds, 2))s</span>
-              </div>
-              <div class="meta">\(fmt(run.realtimeFactor, 0))× realtime · \(run.characters) chars</div>
-              <div class="out">\(escape(run.text))</div>
-            </div>
-            """
-        }.joined()
-
-        return """
-        <section class="panel cmp">
-          <div class="cmphead">
-            <span class="num">\(formatter.string(from: first.date)) · held \(fmt(first.audioSeconds, 1))s</span>
-            <span class="verdict \(sameWords ? "same" : "diff")">\(verdict)</span>
-          </div>
-          <div class="cols">\(columns)</div>
-        </section>
-        """
-    }
-
-    private static func normalized(_ text: String) -> String {
-        text.lowercased()
-            .split { !$0.isLetter && !$0.isNumber }
-            .joined(separator: " ")
     }
 
     private struct EngineSummary {

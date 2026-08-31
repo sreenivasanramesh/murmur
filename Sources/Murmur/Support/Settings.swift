@@ -73,12 +73,6 @@ final class Settings {
         didSet { defaults.set(engine.rawValue, forKey: Keys.engine) }
     }
 
-    /// Run every engine on each recording and show them side by side, instead of
-    /// transcribing with one. Nothing is typed into the focused app in this mode.
-    var compareMode: Bool {
-        didSet { defaults.set(compareMode, forKey: Keys.compareMode) }
-    }
-
     /// Run the cleanup pass before injecting. Off = raw engine output.
     var cleanupEnabled: Bool {
         didSet { defaults.set(cleanupEnabled, forKey: Keys.cleanupEnabled) }
@@ -92,6 +86,16 @@ final class Settings {
     /// Play a short tick when capture starts and stops.
     var soundEnabled: Bool {
         didSet { defaults.set(soundEnabled, forKey: Keys.soundEnabled) }
+    }
+
+    /// User-selected primary microphone UID. nil = system default.
+    var selectedMicrophoneUID: String? {
+        didSet { defaults.set(selectedMicrophoneUID, forKey: Keys.selectedMicrophoneUID) }
+    }
+
+    /// Dedicated microphone used automatically when MacBook lid is closed. nil = none/disabled.
+    var clamshellMicrophoneUID: String? {
+        didSet { defaults.set(clamshellMicrophoneUID, forKey: Keys.clamshellMicrophoneUID) }
     }
 
     /// Automatically launches Murmur in the background when the user logs in.
@@ -133,7 +137,8 @@ final class Settings {
         static let soundEnabled = "soundEnabled"
         static let engine = "engine"
         static let smartCleanup = "smartCleanup"
-        static let compareMode = "compareMode"
+        static let selectedMicrophoneUID = "selectedMicrophoneUID"
+        static let clamshellMicrophoneUID = "clamshellMicrophoneUID"
         static let launchAtLogin = "launchAtLogin"
     }
 
@@ -158,7 +163,8 @@ final class Settings {
         engine = SpeechEngineChoice(rawValue: defaults.string(forKey: Keys.engine) ?? "") ?? .apple
         cleanupEnabled = defaults.object(forKey: Keys.cleanupEnabled) as? Bool ?? true
         smartCleanup = defaults.object(forKey: Keys.smartCleanup) as? Bool ?? false
-        compareMode = defaults.object(forKey: Keys.compareMode) as? Bool ?? false
         soundEnabled = defaults.object(forKey: Keys.soundEnabled) as? Bool ?? true
+        selectedMicrophoneUID = defaults.string(forKey: Keys.selectedMicrophoneUID)
+        clamshellMicrophoneUID = defaults.string(forKey: Keys.clamshellMicrophoneUID)
     }
 }

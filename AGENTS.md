@@ -64,15 +64,6 @@ iCloud-synced folder and the sync engine touches files mid-compile. **Always bui
 writes a `.build/` directory into iCloud, which makes every subsequent build minutes slower.
 If you see this error, wait a few seconds and retry.
 
-**Compare mode doesn't type anything.** By design — `Settings.compareMode` runs every engine
-on one recording and shows them side by side. If both injected, two transcripts would fight
-over one text field. This is the single most confusing behaviour in the app.
-
-**The timing column isn't comparing like with like.** Apple and Parakeet are timed on local
-compute with the clock started *after* model load. Wispr Flow's number is its own
-`e2eLatency`, which includes a network round trip and its cleanup pass. Don't present them
-as one ranking.
-
 **`MainActor.assumeIsolated` will crash the process.** It does not check the claim, it
 asserts it. Use `await MainActor.run` from any non-main-actor context. This took the app
 down once already.
@@ -86,18 +77,8 @@ invisible to SwiftUI's state graph. Don't "clean that up" into `@State`.
 ## Design system
 
 `Sources/Murmur/UI/DesignSystem.swift` defines every colour, size, radius, duration
-and material token. **Views must not contain literal values.** If a component needs a number
-that isn't a token, add the token rather than inlining it.
-
-The direction is 1980s field recorders — Sony TC-D5, Marantz PMD, Nakamichi, Braun. Silver
-face in light appearance, black face in dark. Two rules that are not negotiable:
-
-- **Red means recording.** Nothing else in the app is red.
-- **Amber and green are instrumentation only** — level meters, never UI chrome.
-
-Explicitly ruled out: neon, vaporwave, synthwave, purple/pink gradients, glowing text, chrome
-lettering, grid horizons. There are **no gradients anywhere**; depth comes from flat panels,
-hairline bevels and procedurally-drawn brushed grain.
+and material token for the clean, minimalist UI. **Views must not contain literal values.**
+If a component needs a number that isn't a token, add the token rather than inlining it.
 
 ---
 

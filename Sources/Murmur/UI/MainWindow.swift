@@ -361,6 +361,7 @@ struct SettingsPanelView: View {
     @Bindable var controller: DictationController
     @State private var settings = Settings.shared
     @State private var downloadManager = ParakeetDownloadManager.shared
+    @State private var availableAudioDevices: [AudioInputDevice] = []
 
     @State private var editingHotkeyTarget: HotkeyEditorTarget?
 
@@ -448,7 +449,93 @@ struct SettingsPanelView: View {
                     }
                 }
 
-                // Group 4: Formatting & Audio (Strictly Left-Aligned)
+                // Group 4: Audio & Microphone
+                settingCard(title: "Audio & Microphone", description: "Configure audio input devices and automatic clamshell switching.") {
+                    VStack(alignment: .leading, spacing: 14) {
+                        // Default Microphone Picker
+                        HStack(alignment: .center) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Default microphone")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(DS.Color.ink)
+                                Text("Select your primary audio capture device.")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(DS.Color.inkSecondary)
+                            }
+                            Spacer()
+                            Picker("", selection: Binding(
+                                get: { settings.selectedMicrophoneUID ?? "" },
+                                set: { settings.selectedMicrophoneUID = $0.isEmpty ? nil : $0 }
+                            )) {
+                                Text("System Default").tag("")
+                                ForEach(availableAudioDevices) { dev in
+                                    Text(dev.name).tag(dev.uid)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: 220)
+                        }
+
+                        // Clamshell Microphone Picker (Laptops only)
+                        if HardwareInfo.isLaptop {
+                            Divider().background(DS.Color.border)
+
+                            HStack(alignment: .center) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack(spacing: 6) {
+                                        Text("Clamshell mode microphone")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(DS.Color.ink)
+                                        if HardwareInfo.isClamshellClosed {
+                                            Text("Active")
+                                                .font(.system(size: 10, weight: .semibold))
+                                                .foregroundStyle(DS.Color.success)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(DS.Color.success.opacity(0.12), in: RoundedRectangle(cornerRadius: 5))
+                                        }
+                                    }
+                                    Text("Automatically used when your MacBook lid is closed with an external display.")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(DS.Color.inkSecondary)
+                                }
+                                Spacer()
+                                Picker("", selection: Binding(
+                                    get: { settings.clamshellMicrophoneUID ?? "" },
+                                    set: { settings.clamshellMicrophoneUID = $0.isEmpty ? nil : $0 }
+                                )) {
+                                    Text("None / Use Default").tag("")
+                                    ForEach(availableAudioDevices) { dev in
+                                        Text(dev.name).tag(dev.uid)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(maxWidth: 220)
+                            }
+                        }
+
+                        Divider().background(DS.Color.border)
+
+                        HStack(alignment: .center) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Audio feedback chime")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(DS.Color.ink)
+                                Text("Plays subtle start and stop audio feedback chimes.")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(DS.Color.inkSecondary)
+                            }
+                            Spacer()
+                            Toggle("", isOn: $settings.soundEnabled)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                        }
+                    }
+                }
+
+                // Group 5: Formatting & Audio (Strictly Left-Aligned)
                 settingCard(title: "Formatting & Audio", description: "Configure text formatting rules and audio feedback.") {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack(alignment: .center) {
@@ -482,27 +569,10 @@ struct SettingsPanelView: View {
                                 .toggleStyle(.switch)
                                 .disabled(!FoundationModelFormatter.isAvailable || !settings.cleanupEnabled)
                         }
-
-                        Divider().background(DS.Color.border)
-
-                        HStack(alignment: .center) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Audio feedback chime")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(DS.Color.ink)
-                                Text("Plays subtle start and stop audio feedback chimes.")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(DS.Color.inkSecondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $settings.soundEnabled)
-                                .labelsHidden()
-                                .toggleStyle(.switch)
-                        }
                     }
                 }
 
-                // Group 5: System & Startup
+                // Group 6: System & Startup
                 settingCard(title: "System & Startup", description: "Configure system startup behavior.") {
                     HStack(alignment: .center) {
                         VStack(alignment: .leading, spacing: 3) {
@@ -541,6 +611,7 @@ struct SettingsPanelView: View {
         }
         .onAppear {
             downloadManager.refreshStatus()
+            availableAudioDevices = AudioDeviceManager.availableInputDevices()
         }
     }
 

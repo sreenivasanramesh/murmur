@@ -9,34 +9,18 @@ namespace Murmur.App.Design;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A direct port of <c>DesignSystem.swift</c> — same names, same values, so the two platforms
-/// stay recognisably one product. Direction: 1980s portable field recorders and cassette
-/// decks. Equipment, not theme.
+/// A direct port of <c>DesignSystem.swift</c> — clean, minimalist, modern design tokens.
 /// </para>
 /// <para>
 /// <b>Views must not contain literal values.</b> If a control needs a number that isn't here,
 /// add the token rather than inlining it.
 /// </para>
-/// <para>Two rules that are not negotiable:</para>
-/// <list type="bullet">
-/// <item><b>Red means recording.</b> Nothing else in the app is red.</item>
-/// <item><b>Amber and green are instrumentation only</b> — level meters, never UI chrome.</item>
-/// </list>
-/// <para>
-/// Explicitly ruled out: neon, vaporwave, synthwave, purple/pink gradients, glowing text,
-/// chrome lettering, grid horizons. There are <b>no gradients anywhere</b>; depth comes from
-/// flat panels, hairline bevels and procedurally-drawn brushed grain.
-/// </para>
 /// </remarks>
 public static class Tokens
 {
     /// <summary>
-    /// Whether the black-face palette is in use.
+    /// Whether the dark theme palette is in use.
     /// </summary>
-    /// <remarks>
-    /// Decks shipped in two finishes, so the app does too: <b>silver face</b> (brushed
-    /// aluminium, the Sony TC-D5) in light, <b>black face</b> (matte, the Marantz PMD) in dark.
-    /// </remarks>
     public static bool IsBlackFace =>
         Application.Current?.ActualThemeVariant == ThemeVariant.Dark;
 

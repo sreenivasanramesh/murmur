@@ -121,7 +121,6 @@ enum RunLog {
         let runs = load()
         try? DashboardHTML.render(
             runs: runs,
-            compareMode: Settings.shared.compareMode,
             key: Settings.shared.pushToTalkKey.displayName
         ).write(to: dashboardURL, atomically: true, encoding: .utf8)
     }

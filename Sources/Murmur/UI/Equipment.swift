@@ -77,8 +77,7 @@ struct Well<Content: View>: View {
     }
 }
 
-/// The dark readout window — the tape window of a deck. Darker than a `Well`, and always
-/// dark regardless of face, because a lit readout needs something to be lit against.
+/// The dark readout window container. Darker than a `Well`.
 struct DeckWindow<Content: View>: View {
     var radius: CGFloat = DS.Radius.panel
     @ViewBuilder var content: Content
